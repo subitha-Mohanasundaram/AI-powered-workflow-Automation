@@ -1,14 +1,23 @@
 import json
 import uuid
 
+import pytest
 from fastapi.testclient import TestClient
 
 from backend.app.config import settings
+from backend.app.database import Base, engine
 from backend.app.main import app
+from backend.app import models  # noqa: F401
 from backend.app.services.ai import AIInterpreterService
 from backend.app.services.execution import ExecutionEngineService
 
 client = TestClient(app)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def setup_test_db():
+    Base.metadata.create_all(bind=engine)
+    yield
 
 
 def test_health():
