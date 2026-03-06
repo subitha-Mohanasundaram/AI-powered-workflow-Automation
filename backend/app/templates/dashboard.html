@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Workflow Automation Dashboard</title>
+  <style>
+    :root {
+      --bg: #f2f5f9;
+      --surface: #ffffff;
+      --text: #0f172a;
+      --muted: #64748b;
+      --accent: #0f766e;
+      --danger: #b91c1c;
+      --radius: 14px;
+      --shadow: 0 10px 30px rgba(2, 6, 23, 0.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background: radial-gradient(circle at 20% 0%, #e2f3f1, var(--bg));
+      color: var(--text);
+    }
+    .container {
+      max-width: 1100px;
+      margin: 30px auto 40px;
+      padding: 0 16px;
+    }
+    h1 { margin: 0 0 18px; font-size: 28px; }
+    .card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 18px;
+      margin-bottom: 18px;
+    }
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: 12px;
+    }
+    input, textarea, button {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid #dbe3ea;
+      font-size: 14px;
+    }
+    textarea { min-height: 90px; resize: vertical; grid-column: 1 / span 3; }
+    button {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    th, td {
+      text-align: left;
+      border-bottom: 1px solid #eef2f7;
+      padding: 10px 8px;
+      vertical-align: top;
+    }
+    .muted { color: var(--muted); }
+    .ok { color: var(--accent); font-weight: 600; }
+    .bad { color: var(--danger); font-weight: 600; }
+    .output-box {
+      background: #f8fafc;
+      border: 1px solid #e5edf5;
+      border-radius: 10px;
+      padding: 10px;
+      max-width: 430px;
+    }
+    .pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      background: #e2f3f1;
+      color: #0f766e;
+    }
+    .output-line {
+      margin: 4px 0;
+      line-height: 1.35;
+    }
+    .output-key {
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    pre {
+      margin: 8px 0 0;
+      background: #f8fafc;
+      padding: 8px;
+      border-radius: 8px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-width: 100%;
+      font-size: 12px;
+    }
+    @media (max-width: 760px) {
+      .row { grid-template-columns: 1fr; }
+      textarea { grid-column: auto; }
+      th:nth-child(5), td:nth-child(5) { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <h1>AI Workflow Automation Dashboard</h1>
+
+    <section class="card">
+      <h3>Create Automation Request</h3>
+      <p class="muted">Describe an automation in natural language.</p>
+      <form id="requestForm">
+        <div class="row">
+          <input id="userId" placeholder="User email or ID" value="demo-user@example.com" required />
+          <input id="apiKey" placeholder="API key (optional)" />
+          <button type="submit">Run Automation</button>
+          <textarea id="requestText" placeholder="Example: Fetch daily sales data from API, generate summary report, and send it to Slack and email." required></textarea>
+        </div>
+      </form>
+      <p id="status" class="muted"></p>
+    </section>
+
+    <section class="card">
+      <h3>Automation History</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>User</th>
+            <th>Request</th>
+            <th>Status</th>
+            <th>Output</th>
+            <th>Created</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for run in runs %}
+          <tr>
+            <td>{{ run.id }}</td>
+            <td>{{ run.user_id }}</td>
+            <td>{{ run.request_text }}</td>
+            <td>
+              <div class="{{ 'ok' if run.execution_status == 'success' else 'bad' }}">{{ run.execution_status }}</div>
+              <div class="muted">{{ run.delivery_status }}</div>
+            </td>
+            <td>
+              <div class="output-box">
+                {% set root = run.output %}
+                {% set n8n = root.get('n8n_response', {}) if root is mapping else {} %}
+                {% set severity = n8n.get('severity') %}
+                {% if severity %}
+                  <div class="pill">{{ severity }}</div>
+                {% endif %}
+                <div class="output-line">
+                  <span class="output-key">Correlation</span><br/>
+                  {{ root.get('correlation_id', '-') if root is mapping else '-' }}
+                </div>
+                <div class="output-line">
+                  <span class="output-key">Service</span><br/>
+                  {{ n8n.get('affected_service', '-') }}
+                </div>
+                <div class="output-line">
+                  <span class="output-key">Root Cause</span><br/>
+                  {{ n8n.get('probable_root_cause', n8n.get('message', '-')) }}
+                </div>
+                <div class="output-line">
+                  <span class="output-key">Recommended Actions</span><br/>
+                  {{ n8n.get('recommended_actions', '-') }}
+                </div>
+                <div class="output-line">
+                  <span class="output-key">Priority</span><br/>
+                  {{ n8n.get('priority_message', '-') }}
+                </div>
+                <details>
+                  <summary class="muted">Raw Output</summary>
+                  <pre>{{ run.output }}</pre>
+                </details>
+              </div>
+            </td>
+            <td class="muted">{{ run.created_at }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <script>
+    const form = document.getElementById("requestForm");
+    const statusEl = document.getElementById("status");
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      statusEl.textContent = "Submitting request...";
+      const payload = {
+        user_id: document.getElementById("userId").value.trim(),
+        request_text: document.getElementById("requestText").value.trim()
+      };
+      const apiKey = document.getElementById("apiKey").value.trim();
+      const headers = { "Content-Type": "application/json" };
+      if (apiKey) {
+        headers["X-API-Key"] = apiKey;
+      }
+      try {
+        const res = await fetch("/api/requests", {
+          method: "POST",
+          headers,
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+          const errorText = await res.text();
+          throw new Error(errorText);
+        }
+        statusEl.textContent = "Automation executed. Reloading history...";
+        window.location.reload();
+      } catch (error) {
+        statusEl.textContent = "Failed: " + error.message;
+      }
+    });
+  </script>
+</body>
+</html>
