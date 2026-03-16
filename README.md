@@ -1,128 +1,123 @@
-# AI-Powered Workflow Automation Platform
+# AI-Powered Incident Detection and Automated Investigation Platform
 
-An end-to-end automation system that converts natural-language requests into executable workflows using AI + n8n.
+A production-style demo system that:
 
-This implementation includes a real-world **Incident Triage & RCA** demo flow (payment failure investigation), with dashboard/email delivery, traceability, retries, and idempotency.
+1. Simulates real incidents (error spikes, latency spikes, DB overload)
+2. Stores metrics in Prometheus and logs in Loki
+3. Uses n8n to automate investigation and generate an incident report
+4. Stores incident reports in MongoDB via a Node.js/Express API
+5. Visualizes incidents in a React dashboard (active incidents + timeline)
 
-## Key Features
+## Architecture
 
-- Natural-language automation intake from UI/API/webhook
-- AI instruction parsing into validated workflow schema
-- n8n workflow execution with structured response handling
-- Incident-style output: severity, affected service, root cause, actions
-- Result delivery via dashboard and email
-- Execution history + trace IDs for auditability
-- Reliability controls: retries, idempotency keys, correlation IDs
-- Security baseline: API key protection + API rate limiting
-- Docker deployment and GitHub Actions CI
+```
+Metrics Simulator + Log Generator
+          |                         (logs)
+          | (metrics)                 |
+          v                           v
+     Prometheus                   Loki + Promtail
+          \                         /
+           \                       /
+            v                     v
+                 n8n Investigation Workflow
+                           |
+                           v
+                 Node.js Incident API (Express)
+                           |
+                           v
+                  React Incident Dashboard
+```
 
-## Architecture Modules
+## Services and Ports
 
-1. User Request Module: `POST /api/requests`, `POST /api/webhook/intake`, dashboard form
-2. AI Task Understanding: `AIInterpreterService`
-3. Workflow Generator: `WorkflowGeneratorService`
-4. Execution Engine: `ExecutionEngineService` (n8n webhook + retry/backoff)
-5. Result Delivery: `ResultDeliveryService` (email/dashboard/slack)
-6. Logging Module: SQLite-backed `WorkflowRun` + `IdempotencyRecord`
-7. Dashboard Module: `/dashboard`
-8. Deployment: Docker + Compose (`backend` + `n8n`)
-9. CI/CD: `.github/workflows/ci-cd.yml`
+- Incident API (Express): `http://localhost:8000`
+- Incident Dashboard (React): `http://localhost:3000`
+- n8n: `http://localhost:5678` (login: `admin` / `admin`)
+- Prometheus: `http://localhost:9090`
+- Grafana: `http://localhost:3001` (login: `admin` / `admin`)
+- Loki: `http://localhost:3100`
+- Simulator metrics: `http://localhost:9000/metrics`
 
-## Tech Stack
-
-- FastAPI, Uvicorn
-- SQLAlchemy, SQLite
-- Pydantic
-- Jinja2
-- n8n
-- Docker, Docker Compose
-- GitHub Actions
-
-## Real-World Demo Scenario
-
-Input request:
-
-`Investigate payment failures and send incident report to email and dashboard`
-
-Output includes:
-
-- `severity` (P1/P2/P3)
-- `affected_service`
-- `probable_root_cause`
-- `recommended_actions`
-- `priority_message`
-- `correlation_id`
-- `attempt` (retry metadata)
-
-## Local Setup (Windows)
+## One-Command Run (Docker)
 
 ```cmd
 cd /d "c:\AI-powered workflow Automation"
-python -m venv .venv
-.\.venv\Scripts\activate.bat
-pip install -r backend\requirements.txt
 copy .env.example .env
+docker compose up --build
 ```
 
-Start backend:
+## API Endpoints (Incident API)
+
+- `GET /health` -> `{ "status": "ok" }`
+- `POST /incident-report` (called by n8n)
+- `GET /incidents` (dashboard uses this)
+- `GET /incidents/:id`
+
+## Demo Workflow (n8n)
+
+An importable n8n workflow is provided:
+
+- `n8n-workflows/demo_incident_detection.json`
+- `n8n-workflows/auto_detect_incident.json` (polls every minute and creates incidents automatically)
+
+In n8n:
+
+1. Workflows -> Import from File
+2. Import `n8n-workflows/demo_incident_detection.json`
+3. (Optional) Import `n8n-workflows/auto_detect_incident.json`
+4. Activate the workflow(s)
+
+### Trigger the Demo (Webhook)
+
+The workflow exposes:
+
+- `POST http://localhost:5678/webhook/incident-trigger`
+
+Example:
 
 ```cmd
-uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
+curl -X POST http://localhost:5678/webhook/incident-trigger -H "Content-Type: application/json" -d "{\"service_name\":\"payment-service\",\"reason\":\"demo\"}"
 ```
 
-Start n8n:
+This will:
+
+1. Query Prometheus for error rate, latency, DB utilization
+2. Query Loki for recent error logs
+3. Compute severity (P1/P2/P3) and infer root cause + actions
+4. `POST` the incident report to the Incident API
+
+## Demo Script (Preferred)
+
+Run:
 
 ```cmd
-docker compose up -d n8n
+python scripts\demo_request.py
 ```
 
-Open:
+This triggers n8n and prints the latest stored incident.
 
-- Dashboard: `http://127.0.0.1:8000/dashboard`
-- API docs: `http://127.0.0.1:8000/docs`
-- n8n: `http://127.0.0.1:5678`
+## Auto-Detection Demo (No Manual Trigger)
 
-## Environment Variables
+To demonstrate "n8n detects it" automatically:
 
-Use `.env.example` as template.
+1. In n8n, import and activate `n8n-workflows/auto_detect_incident.json`.
+2. Keep the stack running for 2-3 minutes.
+3. The `simulator` produces periodic spikes (see `SPIKE_EVERY_SECONDS` / `SPIKE_DURATION_SECONDS` in `docker-compose.yml`).
+4. During a spike, the auto workflow will compute severity and, if `severity != P3`, it will `POST /incident-report` to the Incident API.
+5. Open the dashboard and refresh:
+   - `http://localhost:3000`
 
-Important controls:
+If you want to force a spike immediately, temporarily set these in `docker-compose.yml` under the `simulator` service:
 
-- `API_ACCESS_KEY` (optional API auth)
-- `RATE_LIMIT_REQUESTS`, `RATE_LIMIT_WINDOW_SECONDS`
-- `N8N_RETRY_ATTEMPTS`, `N8N_RETRY_BACKOFF_SECONDS`
-- SMTP settings for email delivery (`SMTP_*`, `EMAIL_FROM`)
+- `SPIKE_EVERY_SECONDS=30`
+- `SPIKE_DURATION_SECONDS=20`
 
-## API Security and Reliability Headers
-
-- `X-API-Key` (if `API_ACCESS_KEY` is configured)
-- `X-Idempotency-Key` (deduplicate repeated client retries)
-- `X-Correlation-ID` (trace request across backend + n8n)
-
-## Quick Test
+Then restart:
 
 ```cmd
-python -m pytest backend\tests -q
+docker compose up --build
 ```
 
-PowerShell API test:
+## Notes
 
-```powershell
-$body = @{
-  user_id = "demo-user@example.com"
-  request_text = "Investigate payment failures and send incident report to dashboard"
-} | ConvertTo-Json
-
-Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/requests" -Method Post -ContentType "application/json" -Body $body
-```
-
-## Interview Talking Points
-
-- Built modular AI-to-automation orchestration backend
-- Implemented production-minded controls (rate limiting, idempotency, retry, correlation IDs)
-- Designed dynamic incident triage workflow in n8n with conditional branching
-- Delivered full-stack execution visibility through dashboard + logs
-
-## Important Security Note
-
-Never commit real secrets. Keep `.env` local only and rotate any leaked keys immediately.
+- This repo also contains the earlier FastAPI-based workflow automation prototype under `backend/`, but the incident detection stack uses the Node.js API + React dashboard as specified.
