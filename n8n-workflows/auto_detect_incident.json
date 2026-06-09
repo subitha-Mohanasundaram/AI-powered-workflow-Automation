@@ -1,0 +1,183 @@
+﻿{
+  "name": "Auto - Incident Detection (Every Minute)",
+  "nodes": [
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        }
+      },
+      "id": "Cron",
+      "name": "Cron",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [260, 260]
+    },
+    {
+      "parameters": {
+        "url": "http://prometheus:9090/api/v1/query",
+        "method": "GET",
+        "responseFormat": "json",
+        "queryParametersUi": {
+          "parameter": [
+            {
+              "name": "query",
+              "value": "(sum(rate(http_requests_total{service=\"payment-service\",status=~\"5..\"}[5m])) / sum(rate(http_requests_total{service=\"payment-service\"}[5m]))) * 100"
+            }
+          ]
+        }
+      },
+      "id": "Prometheus Error Rate",
+      "name": "Prometheus - Error Rate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [500, 160]
+    },
+    {
+      "parameters": {
+        "url": "http://prometheus:9090/api/v1/query",
+        "method": "GET",
+        "responseFormat": "json",
+        "queryParametersUi": {
+          "parameter": [
+            {
+              "name": "query",
+              "value": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{service=\"payment-service\"}[5m])) by (le)) * 1000"
+            }
+          ]
+        }
+      },
+      "id": "Prometheus Latency",
+      "name": "Prometheus - Latency P95",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [500, 260]
+    },
+    {
+      "parameters": {
+        "url": "http://prometheus:9090/api/v1/query",
+        "method": "GET",
+        "responseFormat": "json",
+        "queryParametersUi": {
+          "parameter": [
+            {
+              "name": "query",
+              "value": "db_pool_utilization{service=\"payment-service\"}"
+            }
+          ]
+        }
+      },
+      "id": "Prometheus DB Util",
+      "name": "Prometheus - DB Util",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [500, 360]
+    },
+    {
+      "parameters": {
+        "url": "http://loki:3100/loki/api/v1/query_range",
+        "method": "GET",
+        "responseFormat": "json",
+        "queryParametersUi": {
+          "parameter": [
+            {
+              "name": "query",
+              "value": "{app=\"payment-service\"} |= \"ERROR\""
+            },
+            {
+              "name": "limit",
+              "value": "50"
+            },
+            {
+              "name": "start",
+              "value": "={{(Date.now() - 5 * 60 * 1000) * 1000000}}"
+            },
+            {
+              "name": "end",
+              "value": "={{Date.now() * 1000000}}"
+            },
+            {
+              "name": "direction",
+              "value": "backward"
+            }
+          ]
+        }
+      },
+      "id": "Loki Logs",
+      "name": "Loki - Recent Errors",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [500, 460]
+    },
+    {
+      "parameters": {
+        "jsCode": "function pickValue(resp) {\n  try {\n    const result = resp?.data?.result || [];\n    if (!result.length) return 0;\n    return Number(result[0].value?.[1] ?? 0);\n  } catch {\n    return 0;\n  }\n}\n\nfunction extractLogLines(lokiResp) {\n  const out = [];\n  try {\n    const streams = lokiResp?.data?.result || [];\n    for (const s of streams) {\n      const values = s?.values || [];\n      for (const v of values) {\n        out.push(String(v[1] ?? \"\"));\n      }\n    }\n  } catch {}\n  return out;\n}\n\nconst correlation_id = (globalThis.crypto && globalThis.crypto.randomUUID) ? globalThis.crypto.randomUUID() : String(Date.now());\n\nconst errorRate = pickValue($node[\"Prometheus - Error Rate\"].json);\nconst latencyMs = pickValue($node[\"Prometheus - Latency P95\"].json);\nconst dbUtil = pickValue($node[\"Prometheus - DB Util\"].json);\n\nconst logLines = extractLogLines($node[\"Loki - Recent Errors\"].json);\nconst logText = logLines.join('\\n');\n\nlet severity = 'P3';\nif (errorRate > 50 || latencyMs > 1000) severity = 'P1';\nelse if (errorRate >= 20 && errorRate <= 50) severity = 'P2';\n\nlet probable_root_cause = 'Elevated errors detected; collect more telemetry.';\nlet recommended_actions = 'Monitor and assign an owner to investigate.';\n\nconst crashLike = /panic|crash|segfault|killed|oom|rollback|deployment/i.test(logText);\n\nif (dbUtil >= 85) {\n  probable_root_cause = 'Database connection pool saturation';\n  recommended_actions = 'Increase pool size; recycle connections; consider read replicas.';\n} else if (latencyMs > 1000 && dbUtil < 60) {\n  probable_root_cause = 'Downstream dependency slowdown';\n  recommended_actions = 'Enable circuit breaker; increase timeouts; check downstream health.';\n} else if (errorRate > 20 && crashLike) {\n  probable_root_cause = 'Application crash or deployment failure';\n  recommended_actions = 'Rollback deployment; restart service; review recent changes.';\n}\n\nreturn [{\n  json: {\n    correlation_id,\n    timestamp: new Date().toISOString(),\n    service_name: 'payment-service',\n    severity,\n    error_rate_percent: Number(errorRate.toFixed(2)),\n    latency_ms: Number(latencyMs.toFixed(0)),\n    db_pool_utilization: Number(dbUtil.toFixed(0)),\n    probable_root_cause,\n    recommended_actions,\n    logs: logLines.slice(0, 20)\n  }\n}];"
+      },
+      "id": "Compute",
+      "name": "Compute Incident Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [760, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.severity}}",
+              "operation": "notEquals",
+              "value2": "P3"
+            }
+          ]
+        }
+      },
+      "id": "If Sev",
+      "name": "If Severity >= P2",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [980, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://incident-api:8000/incident-report",
+        "method": "POST",
+        "responseFormat": "json",
+        "jsonParameters": true,
+        "bodyParametersJson": "={{$json}}"
+      },
+      "id": "Post",
+      "name": "POST /incident-report",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1200, 220]
+    }
+  ],
+  "connections": {
+    "Cron": {
+      "main": [
+        [
+          { "node": "Prometheus - Error Rate", "type": "main", "index": 0 },
+          { "node": "Prometheus - Latency P95", "type": "main", "index": 0 },
+          { "node": "Prometheus - DB Util", "type": "main", "index": 0 },
+          { "node": "Loki - Recent Errors", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Prometheus - Error Rate": { "main": [[{ "node": "Compute Incident Report", "type": "main", "index": 0 }]] },
+    "Prometheus - Latency P95": { "main": [[{ "node": "Compute Incident Report", "type": "main", "index": 0 }]] },
+    "Prometheus - DB Util": { "main": [[{ "node": "Compute Incident Report", "type": "main", "index": 0 }]] },
+    "Loki - Recent Errors": { "main": [[{ "node": "Compute Incident Report", "type": "main", "index": 0 }]] },
+    "Compute Incident Report": { "main": [[{ "node": "If Severity >= P2", "type": "main", "index": 0 }]] },
+    "If Severity >= P2": {
+      "main": [
+        [{ "node": "POST /incident-report", "type": "main", "index": 0 }],
+        []
+      ]
+    }
+  },
+  "active": false
+}

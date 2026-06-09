@@ -1,232 +1,686 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AI Workflow Automation Dashboard</title>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>AI Workflow Automation</title>
   <style>
-    :root {
-      --bg: #f2f5f9;
-      --surface: #ffffff;
-      --text: #0f172a;
-      --muted: #64748b;
-      --accent: #0f766e;
-      --danger: #b91c1c;
-      --radius: 14px;
-      --shadow: 0 10px 30px rgba(2, 6, 23, 0.08);
+    /* ── Reset & Base ───────────────────────────────────────── */
+    *{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#0f172a;
+      --surface:#1e293b;
+      --surface2:#273548;
+      --border:#334155;
+      --text:#f1f5f9;
+      --muted:#94a3b8;
+      --accent:#14b8a6;
+      --accent2:#0d9488;
+      --green:#22c55e;
+      --red:#ef4444;
+      --amber:#f59e0b;
+      --blue:#3b82f6;
+      --purple:#a78bfa;
+      --radius:12px;
+      --radius-sm:8px;
     }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-      background: radial-gradient(circle at 20% 0%, #e2f3f1, var(--bg));
-      color: var(--text);
+    body{font-family:"Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+    a{color:var(--accent);text-decoration:none}
+    a:hover{text-decoration:underline}
+    ::-webkit-scrollbar{width:6px;height:6px}
+    ::-webkit-scrollbar-track{background:var(--surface)}
+    ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+    /* ── Header ─────────────────────────────────────────────── */
+    .header{
+      background:linear-gradient(135deg,#0f172a 0%,#134e4a 50%,#0f172a 100%);
+      border-bottom:1px solid var(--border);
+      padding:20px 32px;
+      display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;
     }
-    .container {
-      max-width: 1100px;
-      margin: 30px auto 40px;
-      padding: 0 16px;
-    }
-    h1 { margin: 0 0 18px; font-size: 28px; }
-    .card {
-      background: var(--surface);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      padding: 18px;
-      margin-bottom: 18px;
-    }
-    .row {
-      display: grid;
-      grid-template-columns: 1fr 1fr auto;
-      gap: 12px;
-    }
-    input, textarea, button {
-      width: 100%;
-      padding: 10px 12px;
-      border-radius: 10px;
-      border: 1px solid #dbe3ea;
-      font-size: 14px;
-    }
-    textarea { min-height: 90px; resize: vertical; grid-column: 1 / span 3; }
-    button {
-      background: var(--accent);
-      color: #fff;
-      border: none;
-      cursor: pointer;
-      font-weight: 600;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 14px;
-    }
-    th, td {
-      text-align: left;
-      border-bottom: 1px solid #eef2f7;
-      padding: 10px 8px;
-      vertical-align: top;
-    }
-    .muted { color: var(--muted); }
-    .ok { color: var(--accent); font-weight: 600; }
-    .bad { color: var(--danger); font-weight: 600; }
-    .output-box {
-      background: #f8fafc;
-      border: 1px solid #e5edf5;
-      border-radius: 10px;
-      padding: 10px;
-      max-width: 430px;
-    }
-    .pill {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 999px;
-      font-size: 12px;
-      font-weight: 600;
-      margin-bottom: 8px;
-      background: #e2f3f1;
-      color: #0f766e;
-    }
-    .output-line {
-      margin: 4px 0;
-      line-height: 1.35;
-    }
-    .output-key {
-      color: var(--muted);
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.03em;
-    }
-    pre {
-      margin: 8px 0 0;
-      background: #f8fafc;
-      padding: 8px;
-      border-radius: 8px;
-      white-space: pre-wrap;
-      word-break: break-word;
-      max-width: 100%;
-      font-size: 12px;
-    }
-    @media (max-width: 760px) {
-      .row { grid-template-columns: 1fr; }
-      textarea { grid-column: auto; }
-      th:nth-child(5), td:nth-child(5) { display: none; }
-    }
+    .header-brand{display:flex;align-items:center;gap:12px}
+    .brand-icon{width:42px;height:42px;background:linear-gradient(135deg,var(--accent),var(--blue));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px}
+    .brand-name{font-size:20px;font-weight:800;letter-spacing:-.5px}
+    .brand-sub{font-size:12px;color:var(--muted);margin-top:2px}
+    .header-nav{display:flex;gap:8px;flex-wrap:wrap}
+    .nav-btn{padding:7px 14px;border-radius:var(--radius-sm);border:1px solid var(--border);background:transparent;color:var(--muted);font-size:13px;cursor:pointer;transition:.2s;text-decoration:none;display:inline-block}
+    .nav-btn:hover{background:var(--surface2);color:var(--text);text-decoration:none}
+
+    /* ── Layout ─────────────────────────────────────────────── */
+    .main{max-width:1300px;margin:0 auto;padding:28px 20px;display:grid;grid-template-columns:380px 1fr;gap:20px;align-items:start}
+    @media(max-width:900px){.main{grid-template-columns:1fr}}
+
+    /* ── Card ───────────────────────────────────────────────── */
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+    .card-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+    .card-title{font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px}
+    .card-body{padding:18px}
+
+    /* ── Request form ───────────────────────────────────────── */
+    .form-field{margin-bottom:14px}
+    .form-label{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;display:block}
+    .form-input{width:100%;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:14px;transition:.2s}
+    .form-input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(20,184,166,.15)}
+    .form-input::placeholder{color:var(--muted)}
+    textarea.form-input{min-height:100px;resize:vertical;font-family:inherit;line-height:1.5}
+    .run-btn{width:100%;padding:12px;background:linear-gradient(135deg,var(--accent),var(--blue));border:none;border-radius:var(--radius-sm);color:#fff;font-size:15px;font-weight:700;cursor:pointer;transition:.2s;letter-spacing:.3px;margin-top:4px}
+    .run-btn:hover{filter:brightness(1.1);transform:translateY(-1px)}
+    .run-btn:active{transform:translateY(0)}
+    .run-btn.loading{opacity:.7;cursor:not-allowed}
+
+    /* Status message */
+    .status-msg{font-size:13px;padding:8px 12px;border-radius:var(--radius-sm);margin-top:10px;display:none}
+    .status-msg.show{display:block}
+    .status-msg.success{background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.2)}
+    .status-msg.error{background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.2)}
+    .status-msg.info{background:rgba(59,130,246,.1);color:var(--blue);border:1px solid rgba(59,130,246,.2)}
+
+    /* Quick examples */
+    .examples-label{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;margin-top:16px;display:block}
+    .examples-grid{display:flex;flex-direction:column;gap:6px}
+    .ex-item{padding:9px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;font-size:13px;color:var(--muted);transition:.2s;line-height:1.4}
+    .ex-item:hover{border-color:var(--accent);color:var(--text);background:rgba(20,184,166,.05)}
+    .ex-item .ex-icon{margin-right:6px}
+
+    /* ── Stats row ──────────────────────────────────────────── */
+    .stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px}
+    .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px}
+    .stat-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+    .stat-value{font-size:26px;font-weight:800}
+    .stat-sub{font-size:11px;color:var(--muted);margin-top:2px}
+
+    /* ── Run list ───────────────────────────────────────────── */
+    .runs-container{display:flex;flex-direction:column;gap:16px}
+    .empty-state{text-align:center;padding:60px 20px;color:var(--muted)}
+    .empty-icon{font-size:48px;margin-bottom:12px}
+    .empty-text{font-size:16px;font-weight:600;margin-bottom:6px;color:var(--text)}
+    .empty-sub{font-size:13px}
+
+    /* ── Run card ───────────────────────────────────────────── */
+    .run-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:.2s}
+    .run-card:hover{border-color:rgba(20,184,166,.3)}
+
+    .run-card-header{padding:14px 18px;display:flex;align-items:flex-start;gap:12px;background:var(--surface2)}
+    .run-num{width:32px;height:32px;border-radius:50%;background:var(--border);color:var(--muted);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .run-info{flex:1;min-width:0}
+    .run-request{font-size:14px;font-weight:600;word-break:break-word;line-height:1.4;margin-bottom:4px}
+    .run-meta-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .run-user{font-size:12px;color:var(--muted)}
+    .run-time{font-size:11px;color:var(--muted)}
+    .badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+    .badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.02em}
+    .badge-success{background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.2)}
+    .badge-failed{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.2)}
+    .badge-weather{background:rgba(251,191,36,.12);color:#fbbf24;border:1px solid rgba(251,191,36,.2)}
+    .badge-news{background:rgba(167,139,250,.12);color:var(--purple);border:1px solid rgba(167,139,250,.2)}
+    .badge-github{background:rgba(148,163,184,.12);color:#cbd5e1;border:1px solid rgba(148,163,184,.2)}
+    .badge-currency{background:rgba(34,197,94,.12);color:var(--green);border:1px solid rgba(34,197,94,.2)}
+    .badge-leetcode{background:rgba(251,146,60,.12);color:#fb923c;border:1px solid rgba(251,146,60,.2)}
+    .badge-local{background:rgba(59,130,246,.12);color:var(--blue);border:1px solid rgba(59,130,246,.2)}
+
+    /* ── Output tabs ────────────────────────────────────────── */
+    .run-card-body{padding:16px 18px}
+    .output-tabs{display:flex;gap:2px;background:var(--bg);border-radius:var(--radius-sm);padding:3px;margin-bottom:16px;width:fit-content}
+    .tab-btn{padding:6px 14px;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:.2s;background:transparent;color:var(--muted)}
+    .tab-btn.active{background:var(--surface);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.3)}
+    .tab-pane{display:none}
+    .tab-pane.active{display:block}
+
+    /* ── Report display ─────────────────────────────────────── */
+    .report-summary{background:linear-gradient(135deg,rgba(20,184,166,.08),rgba(59,130,246,.08));border:1px solid rgba(20,184,166,.2);border-radius:var(--radius-sm);padding:12px 16px;font-size:14px;line-height:1.7;margin-bottom:14px;color:var(--text)}
+    .section-title{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;margin-top:14px}
+    .section-title:first-child{margin-top:0}
+
+    /* Metric grid */
+    .metric-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-bottom:4px}
+    .metric-box{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px}
+    .metric-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+    .metric-value{font-size:18px;font-weight:800;line-height:1}
+    .metric-sub{font-size:11px;color:var(--muted);margin-top:3px}
+
+    /* Data table */
+    .data-table{width:100%;border-collapse:collapse;font-size:13px}
+    .data-table th{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em;font-weight:600}
+    .data-table td{padding:8px 10px;border-bottom:1px solid rgba(51,65,85,.5);vertical-align:middle}
+    .data-table tr:last-child td{border-bottom:none}
+    .data-table tr:hover td{background:rgba(255,255,255,.02)}
+
+    /* Articles */
+    .article-list{display:flex;flex-direction:column;gap:8px}
+    .article-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;border-left:3px solid var(--accent)}
+    .article-title{font-size:13px;font-weight:600;margin-bottom:3px}
+    .article-title a{color:var(--text)}
+    .article-title a:hover{color:var(--accent)}
+    .article-meta{font-size:11px;color:var(--muted)}
+
+    /* Forecast cards */
+    .forecast-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px}
+    .forecast-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;text-align:center}
+    .forecast-date{font-size:11px;color:var(--muted);margin-bottom:4px}
+    .forecast-cond{font-size:12px;font-weight:600;margin-bottom:4px;line-height:1.3}
+    .forecast-temp{font-size:13px;font-weight:700}
+    .forecast-rain{font-size:11px;color:#60a5fa;margin-top:3px}
+
+    /* Commit list */
+    .commit-item{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid rgba(51,65,85,.5)}
+    .commit-item:last-child{border-bottom:none}
+    .commit-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);flex-shrink:0;margin-top:5px}
+    .commit-msg{font-size:13px;font-weight:500;line-height:1.4}
+    .commit-meta{font-size:11px;color:var(--muted);margin-top:2px}
+
+    /* Workflow steps */
+    .steps-flow{display:flex;flex-direction:column;gap:3px}
+    .step-row{display:flex;align-items:center;gap:10px;padding:7px 10px;background:var(--surface2);border-radius:6px;border:1px solid var(--border)}
+    .step-idx{width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--blue));color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .step-name{font-size:13px;font-weight:600}
+    .step-action{font-size:11px;color:var(--accent);margin-left:6px;background:rgba(20,184,166,.1);padding:1px 6px;border-radius:4px}
+    .step-arrow{text-align:center;color:var(--border);font-size:12px;padding:1px 0}
+
+    /* ── JSON view ──────────────────────────────────────────── */
+    .json-toolbar{display:flex;gap:8px;margin-bottom:10px;align-items:center}
+    .copy-btn{padding:5px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--muted);font-size:12px;cursor:pointer;transition:.2s}
+    .copy-btn:hover{border-color:var(--accent);color:var(--accent)}
+    .json-select{padding:5px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;cursor:pointer}
+    .json-view{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;font-family:"Cascadia Code","Fira Code","Consolas",monospace;font-size:12px;line-height:1.6;white-space:pre-wrap;word-break:break-all;max-height:400px;overflow-y:auto;color:#e2e8f0}
+    .json-key{color:#7dd3fc}
+    .json-str{color:#86efac}
+    .json-num{color:#fbbf24}
+    .json-bool{color:#c084fc}
+    .json-null{color:#94a3b8}
   </style>
 </head>
 <body>
-  <main class="container">
-    <h1>AI Workflow Automation Dashboard</h1>
 
-    <section class="card">
-      <h3>Create Automation Request</h3>
-      <p class="muted">Describe an automation in natural language.</p>
-      <form id="requestForm">
-        <div class="row">
-          <input id="userId" placeholder="User email or ID" value="demo-user@example.com" required />
-          <input id="apiKey" placeholder="API key (optional)" />
-          <button type="submit">Run Automation</button>
-          <textarea id="requestText" placeholder="Example: Fetch daily sales data from API, generate summary report, and send it to Slack and email." required></textarea>
+<!-- Header -->
+<header class="header">
+  <div class="header-brand">
+    <div class="brand-icon">⚡</div>
+    <div>
+      <div class="brand-name">AI Workflow Automation</div>
+      <div class="brand-sub">Natural language → Automated execution → Instant reports</div>
+    </div>
+  </div>
+  <nav class="header-nav">
+    <a href="/api/leetcode/dashboard" class="nav-btn">🏆 LeetCode Tracker</a>
+    <a href="/docs" class="nav-btn">📖 API Docs</a>
+    <a href="/health/ready" class="nav-btn">❤️ Health</a>
+    {% if auth_enabled %}
+      <span class="nav-btn" style="color:#22c55e;border-color:rgba(34,197,94,.3)">🔒 Secured</span>
+    {% endif %}
+  </nav>
+</header>
+
+<main class="main">
+
+  <!-- LEFT: Request panel -->
+  <aside>
+
+    <!-- Stats -->
+    <div class="stats-row" style="grid-template-columns:repeat(3,1fr);margin-bottom:16px">
+      <div class="stat-card">
+        <div class="stat-label">Total Runs</div>
+        <div class="stat-value" style="color:var(--accent)">{{ runs | length }}</div>
+        <div class="stat-sub">all time</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Successful</div>
+        <div class="stat-value" style="color:var(--green)">{{ runs | selectattr('execution_status','eq','success') | list | length }}</div>
+        <div class="stat-sub">executions</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Failed</div>
+        <div class="stat-value" style="color:var(--red)">{{ runs | rejectattr('execution_status','eq','success') | list | length }}</div>
+        <div class="stat-sub">executions</div>
+      </div>
+    </div>
+
+    <!-- Request form -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">✨ New Automation</div>
+      </div>
+      <div class="card-body">
+        <form id="requestForm">
+          <div class="form-field">
+            <label class="form-label">Your ID / Email</label>
+            <input class="form-input" id="userId" value="demo-user@example.com" placeholder="you@company.com" required/>
+          </div>
+          <div class="form-field">
+            <label class="form-label">What do you want to automate?</label>
+            <textarea class="form-input" id="requestText" placeholder="Describe your task in plain English...&#10;&#10;Examples:&#10;• Fetch weather for Chennai&#10;• Get top tech news today&#10;• LeetCode report for my class&#10;• GitHub stats for microsoft/vscode&#10;• USD to INR exchange rates" required></textarea>
+          </div>
+          <div class="form-field" style="margin-bottom:8px">
+            <label class="form-label">API Key <span style="font-weight:400;text-transform:none">(leave blank if not required)</span></label>
+            <input class="form-input" id="apiKey" placeholder="sk-..."/>
+          </div>
+          <button type="submit" class="run-btn" id="runBtn">⚡ Run Automation</button>
+        </form>
+        <div class="status-msg" id="statusMsg"></div>
+
+        <span class="examples-label">Quick examples</span>
+        <div class="examples-grid">
+          <div class="ex-item" onclick="setExample(this)"><span class="ex-icon">🌤️</span>Fetch weather report for Chennai and show on dashboard</div>
+          <div class="ex-item" onclick="setExample(this)"><span class="ex-icon">📰</span>Get top technology news headlines today</div>
+          <div class="ex-item" onclick="setExample(this)"><span class="ex-icon">🏆</span>Generate a report on the leetcode solving status of my students</div>
+          <div class="ex-item" onclick="setExample(this)"><span class="ex-icon">🐙</span>Fetch GitHub stats for microsoft/vscode and generate report</div>
+          <div class="ex-item" onclick="setExample(this)"><span class="ex-icon">💱</span>Get USD to INR currency exchange rates</div>
+          <div class="ex-item" onclick="setExample(this)"><span class="ex-icon">📊</span>Fetch sales data and generate a weekly summary report</div>
         </div>
-      </form>
-      <p id="status" class="muted"></p>
-    </section>
+      </div>
+    </div>
 
-    <section class="card">
-      <h3>Automation History</h3>
-      <table>
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>User</th>
-            <th>Request</th>
-            <th>Status</th>
-            <th>Output</th>
-            <th>Created</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for run in runs %}
-          <tr>
-            <td>{{ run.id }}</td>
-            <td>{{ run.user_id }}</td>
-            <td>{{ run.request_text }}</td>
-            <td>
-              <div class="{{ 'ok' if run.execution_status == 'success' else 'bad' }}">{{ run.execution_status }}</div>
-              <div class="muted">{{ run.delivery_status }}</div>
-            </td>
-            <td>
-              <div class="output-box">
-                {% set root = run.output %}
-                {% set n8n = root.get('n8n_response', {}) if root is mapping else {} %}
-                {% set severity = n8n.get('severity') %}
-                {% if severity %}
-                  <div class="pill">{{ severity }}</div>
-                {% endif %}
-                <div class="output-line">
-                  <span class="output-key">Correlation</span><br/>
-                  {{ root.get('correlation_id', '-') if root is mapping else '-' }}
+  </aside>
+
+  <!-- RIGHT: Reports -->
+  <section>
+    {% if not runs %}
+    <div class="card">
+      <div class="card-body">
+        <div class="empty-state">
+          <div class="empty-icon">🚀</div>
+          <div class="empty-text">No reports yet</div>
+          <div class="empty-sub">Submit your first automation request on the left to get started</div>
+        </div>
+      </div>
+    </div>
+    {% else %}
+    <div class="runs-container">
+      {% for run in runs %}
+
+      {% set root = run.output if run.output is mapping else {} %}
+      {% set n8n = root.get('n8n_response', {}) if root is mapping else {} %}
+      {% set mode = root.get('execution_mode', 'local') %}
+      {% set step_results = root.get('step_results', []) %}
+      {% set source = '' %}
+      {% for sr in step_results %}{% if sr is mapping and sr.get('result') is mapping %}{% if sr.get('result',{}).get('source') %}{% set source = sr.get('result',{}).get('source','') %}{% endif %}{% endif %}{% endfor %}
+      {% set payload = run.payload if run.payload is mapping else {} %}
+      {% set steps = payload.get('steps', []) %}
+
+      <div class="run-card">
+
+        <!-- Run header -->
+        <div class="run-card-header">
+          <div class="run-num">#{{ run.id }}</div>
+          <div class="run-info" style="flex:1;min-width:0">
+            <div class="run-request">{{ run.request_text }}</div>
+            <div class="run-meta-row" style="margin-top:4px">
+              <span class="run-user">👤 {{ run.user_id }}</span>
+              <span class="run-time">🕐 {{ run.created_at[:16] if run.created_at else '' }}</span>
+            </div>
+            <div class="badges">
+              {% if run.execution_status == 'success' %}
+                <span class="badge badge-success">✓ Success</span>
+              {% else %}
+                <span class="badge badge-failed">✗ {{ run.execution_status }}</span>
+              {% endif %}
+              {% if mode == 'leetcode' %}<span class="badge badge-leetcode">🏆 LeetCode</span>
+              {% elif source == 'open-meteo' %}<span class="badge badge-weather">🌤️ Weather</span>
+              {% elif source in ('gnews','hackernews') %}<span class="badge badge-news">📰 News</span>
+              {% elif source == 'github' %}<span class="badge badge-github">🐙 GitHub</span>
+              {% elif source == 'open.er-api.com' %}<span class="badge badge-currency">💱 Currency</span>
+              {% else %}<span class="badge badge-local">⚙️ Local</span>
+              {% endif %}
+              <span class="badge" style="background:rgba(148,163,184,.1);color:var(--muted);border:1px solid rgba(148,163,184,.2)">{{ run.delivery_status }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Output tabs -->
+        <div class="run-card-body">
+          <div class="output-tabs">
+            <button class="tab-btn active" onclick="switchTab(this,'report-{{ run.id }}')">📋 Report</button>
+            <button class="tab-btn" onclick="switchTab(this,'json-{{ run.id }}')">{ } JSON</button>
+            <button class="tab-btn" onclick="switchTab(this,'flow-{{ run.id }}')">🔀 Workflow</button>
+          </div>
+
+          <!-- ═══════════════════════════════════════════════ -->
+          <!-- REPORT TAB                                      -->
+          <!-- ═══════════════════════════════════════════════ -->
+          <div class="tab-pane active" id="report-{{ run.id }}">
+
+            {# Summary banner #}
+            {% set summary_text = n8n.get('probable_root_cause','') %}
+            {% if summary_text and summary_text != '-' %}
+            <div class="report-summary">{{ summary_text }}</div>
+            {% endif %}
+
+            {# ── WEATHER ── #}
+            {% if source == 'open-meteo' %}
+              {% for sr in step_results %}{% if sr is mapping and sr.get('result',{}).get('source') == 'open-meteo' %}
+              {% set wd = sr.get('result',{}) %}{% set cur = wd.get('current',{}) %}
+              <div class="section-title">🌍 Current Conditions — {{ wd.get('city','') }}</div>
+              <div class="metric-grid">
+                <div class="metric-box">
+                  <div class="metric-label">Temperature</div>
+                  <div class="metric-value" style="color:#fbbf24">{{ cur.get('temperature','--') }}</div>
+                  <div class="metric-sub">Feels {{ cur.get('feels_like','--') }}</div>
                 </div>
-                <div class="output-line">
-                  <span class="output-key">Service</span><br/>
-                  {{ n8n.get('affected_service', '-') }}
+                <div class="metric-box">
+                  <div class="metric-label">Condition</div>
+                  <div class="metric-value" style="font-size:14px;line-height:1.3">{{ cur.get('condition','--') }}</div>
                 </div>
-                <div class="output-line">
-                  <span class="output-key">Root Cause</span><br/>
-                  {{ n8n.get('probable_root_cause', n8n.get('message', '-')) }}
+                <div class="metric-box">
+                  <div class="metric-label">Humidity</div>
+                  <div class="metric-value" style="color:#60a5fa">{{ cur.get('humidity','--') }}</div>
                 </div>
-                <div class="output-line">
-                  <span class="output-key">Recommended Actions</span><br/>
-                  {{ n8n.get('recommended_actions', '-') }}
+                <div class="metric-box">
+                  <div class="metric-label">Wind Speed</div>
+                  <div class="metric-value" style="font-size:15px">{{ cur.get('wind_speed','--') }}</div>
                 </div>
-                <div class="output-line">
-                  <span class="output-key">Priority</span><br/>
-                  {{ n8n.get('priority_message', '-') }}
+                <div class="metric-box">
+                  <div class="metric-label">Precipitation</div>
+                  <div class="metric-value" style="font-size:15px">{{ cur.get('precipitation','0 mm') }}</div>
                 </div>
-                <details>
-                  <summary class="muted">Raw Output</summary>
-                  <pre>{{ run.output }}</pre>
-                </details>
+                <div class="metric-box">
+                  <div class="metric-label">Pressure</div>
+                  <div class="metric-value" style="font-size:14px">{{ cur.get('pressure','--') }}</div>
+                </div>
               </div>
-            </td>
-            <td class="muted">{{ run.created_at }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </section>
-  </main>
+              {% set forecast = wd.get('forecast_5day',[]) %}
+              {% if forecast %}
+              <div class="section-title" style="margin-top:14px">📅 5-Day Forecast</div>
+              <div class="forecast-grid">
+                {% for day in forecast %}
+                <div class="forecast-card">
+                  <div class="forecast-date">{{ day.get('date','') }}</div>
+                  <div class="forecast-cond">{{ day.get('condition','') }}</div>
+                  <div class="forecast-temp">{{ day.get('max_temp','') }} / {{ day.get('min_temp','') }}</div>
+                  {% if day.get('rain_mm',0) %}<div class="forecast-rain">💧 {{ day.get('rain_mm','0') }}mm</div>{% endif %}
+                </div>
+                {% endfor %}
+              </div>
+              {% endif %}
+              {% endif %}{% endfor %}
 
-  <script>
-    const form = document.getElementById("requestForm");
-    const statusEl = document.getElementById("status");
-    form.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      statusEl.textContent = "Submitting request...";
-      const payload = {
-        user_id: document.getElementById("userId").value.trim(),
-        request_text: document.getElementById("requestText").value.trim()
-      };
-      const apiKey = document.getElementById("apiKey").value.trim();
-      const headers = { "Content-Type": "application/json" };
-      if (apiKey) {
-        headers["X-API-Key"] = apiKey;
-      }
-      try {
-        const res = await fetch("/api/requests", {
-          method: "POST",
-          headers,
-          body: JSON.stringify(payload)
-        });
-        if (!res.ok) {
-          const errorText = await res.text();
-          throw new Error(errorText);
-        }
-        statusEl.textContent = "Automation executed. Reloading history...";
-        window.location.reload();
-      } catch (error) {
-        statusEl.textContent = "Failed: " + error.message;
-      }
-    });
-  </script>
+            {# ── NEWS ── #}
+            {% elif source in ('gnews','hackernews') %}
+              {% for sr in step_results %}{% if sr is mapping and sr.get('result',{}).get('source') in ('gnews','hackernews') %}
+              {% set nd = sr.get('result',{}) %}
+              <div class="section-title">📰 Top Headlines — {{ nd.get('topic','').title() }}</div>
+              <div class="article-list">
+                {% for a in nd.get('articles',[]) %}
+                <div class="article-card">
+                  <div class="article-title">
+                    {% if a.get('url') %}<a href="{{ a.get('url') }}" target="_blank">{{ a.get('title','') }}</a>
+                    {% else %}{{ a.get('title','') }}{% endif %}
+                  </div>
+                  <div class="article-meta">
+                    📡 {{ a.get('source','') }}
+                    {% if a.get('published_at') %} &nbsp;·&nbsp; 📅 {{ a.get('published_at','')[:10] }}{% endif %}
+                    {% if a.get('score') %} &nbsp;·&nbsp; ⬆️ {{ a.get('score','') }}{% endif %}
+                  </div>
+                </div>
+                {% endfor %}
+              </div>
+              {% endif %}{% endfor %}
+
+            {# ── GITHUB ── #}
+            {% elif source == 'github' %}
+              {% for sr in step_results %}{% if sr is mapping and sr.get('result',{}).get('source') == 'github' %}
+              {% set gd = sr.get('result',{}) %}{% set stats = gd.get('stats',{}) %}
+              <div class="section-title">🐙 Repository — {{ gd.get('repo','') }}</div>
+              <div class="metric-grid">
+                <div class="metric-box"><div class="metric-label">Stars</div><div class="metric-value" style="color:#fbbf24">{{ '{:,}'.format(stats.get('stars',0)) }}</div></div>
+                <div class="metric-box"><div class="metric-label">Forks</div><div class="metric-value" style="color:var(--blue)">{{ '{:,}'.format(stats.get('forks',0)) }}</div></div>
+                <div class="metric-box"><div class="metric-label">Open Issues</div><div class="metric-value" style="color:var(--red)">{{ '{:,}'.format(stats.get('open_issues',0)) }}</div></div>
+                <div class="metric-box"><div class="metric-label">Language</div><div class="metric-value" style="font-size:14px">{{ stats.get('language','--') }}</div></div>
+              </div>
+              {% set commits = gd.get('recent_commits',[]) %}{% if commits %}
+              <div class="section-title" style="margin-top:14px">📝 Recent Commits</div>
+              <div>{% for c in commits %}<div class="commit-item"><div class="commit-dot"></div><div><div class="commit-msg">{{ c.get('message','') }}</div><div class="commit-meta">👤 {{ c.get('author','') }} &nbsp;·&nbsp; 📅 {{ c.get('date','')[:10] }}</div></div></div>{% endfor %}</div>
+              {% endif %}
+              {% endif %}{% endfor %}
+
+            {# ── CURRENCY ── #}
+            {% elif source == 'open.er-api.com' %}
+              {% for sr in step_results %}{% if sr is mapping and sr.get('result',{}).get('source') == 'open.er-api.com' %}
+              {% set cd = sr.get('result',{}) %}
+              <div class="section-title">💱 Exchange Rates — Base: {{ cd.get('base_currency','') }}</div>
+              <div class="metric-grid">
+                {% for code, rate in cd.get('rates',{}).items() %}
+                <div class="metric-box">
+                  <div class="metric-label">{{ code }}</div>
+                  <div class="metric-value" style="font-size:16px;color:var(--green)">{{ rate }}</div>
+                </div>
+                {% endfor %}
+              </div>
+              {% endif %}{% endfor %}
+
+            {# ── LEETCODE ── #}
+            {% elif mode == 'leetcode' %}
+              {% set lc = root.get('leetcode_report', {}) %}
+              {% set lcs = lc.get('summary', n8n.get('summary', {})) %}
+              {% if lcs %}
+              <div class="section-title">📊 Class Summary — {{ lc.get('date','') }}</div>
+              <div class="metric-grid">
+                <div class="metric-box"><div class="metric-label">Students</div><div class="metric-value" style="color:var(--accent)">{{ lcs.get('total_students','-') }}</div></div>
+                <div class="metric-box"><div class="metric-label">Active Today</div><div class="metric-value" style="color:var(--green)">{{ lcs.get('active_today','-') }}</div></div>
+                <div class="metric-box"><div class="metric-label">Solved Today</div><div class="metric-value" style="color:var(--blue)">{{ lcs.get('problems_solved_today','-') }}</div></div>
+                <div class="metric-box"><div class="metric-label">Total All-Time</div><div class="metric-value">{{ lcs.get('total_problems_solved_alltime','-') }}</div></div>
+                <div class="metric-box"><div class="metric-label">Average</div><div class="metric-value" style="font-size:16px">{{ lcs.get('average_solved','-') }}</div></div>
+              </div>
+              {% endif %}
+              {% set leaderboard = lc.get('leaderboard', n8n.get('leaderboard',[])) %}
+              {% if leaderboard %}
+              <div class="section-title" style="margin-top:14px">🏅 Leaderboard</div>
+              <div style="overflow-x:auto">
+              <table class="data-table">
+                <thead><tr><th>#</th><th>Student</th><th>Total</th><th>Easy</th><th>Medium</th><th>Hard</th><th>Today</th></tr></thead>
+                <tbody>
+                {% for s in leaderboard %}
+                <tr>
+                  <td style="font-weight:700;color:{% if s.get('rank')==1 %}#fbbf24{% elif s.get('rank')==2 %}#94a3b8{% elif s.get('rank')==3 %}#f97316{% else %}var(--muted){% endif %}">
+                    {{ '🥇' if s.get('rank')==1 else '🥈' if s.get('rank')==2 else '🥉' if s.get('rank')==3 else s.get('rank','') }}
+                  </td>
+                  <td><strong>{{ s.get('real_name',s.get('username','')) }}</strong><br/><span style="font-size:11px;color:var(--muted)">@{{ s.get('username','') }}</span></td>
+                  <td style="font-weight:700">{{ s.get('total_solved',0) }}</td>
+                  <td style="color:var(--green)">{{ s.get('easy',0) }}</td>
+                  <td style="color:var(--amber)">{{ s.get('medium',0) }}</td>
+                  <td style="color:var(--red)">{{ s.get('hard',0) }}</td>
+                  <td>{% if s.get('solved_today',0)>0 %}<span style="color:var(--green);font-weight:700">+{{ s.get('solved_today',0) }}</span>{% else %}<span style="color:var(--muted)">—</span>{% endif %}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+              </table>
+              </div>
+              {% endif %}
+
+            {# ── GENERIC / LOCAL ── #}
+            {% else %}
+              {% set report_result = {} %}
+              {% for sr in step_results %}{% if sr is mapping and 'report' in sr.get('step','') %}{% set report_result = sr.get('result',{}) %}{% endif %}{% endfor %}
+              {% if report_result %}
+              {% if report_result.get('title') %}<div class="section-title">📄 {{ report_result.get('title','Report') }}</div>{% endif %}
+              {% if report_result.get('summary') %}<div class="report-summary">{{ report_result.get('summary') }}</div>{% endif %}
+              {% set sections = report_result.get('sections',[]) %}
+              {% if sections %}
+              <table class="data-table">
+                {% for sec in sections %}
+                <tr><td style="color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;white-space:nowrap;padding-right:16px;width:150px">{{ sec.get('heading','') }}</td><td>{{ sec.get('content','') }}</td></tr>
+                {% endfor %}
+              </table>
+              {% endif %}
+              {% elif n8n %}
+              <table class="data-table">
+                {% if n8n.get('affected_service') and n8n.get('affected_service') != '-' %}<tr><td style="color:var(--muted);font-size:12px;text-transform:uppercase;width:150px">Service</td><td>{{ n8n.get('affected_service') }}</td></tr>{% endif %}
+                {% if n8n.get('recommended_actions') and n8n.get('recommended_actions') != '-' %}<tr><td style="color:var(--muted);font-size:12px;text-transform:uppercase">Actions</td><td>{{ n8n.get('recommended_actions') }}</td></tr>{% endif %}
+                {% if n8n.get('priority_message') and n8n.get('priority_message') != '-' %}<tr><td style="color:var(--muted);font-size:12px;text-transform:uppercase">Result</td><td>{{ n8n.get('priority_message') }}</td></tr>{% endif %}
+              </table>
+              {% endif %}
+            {% endif %}
+
+          </div>{# /report tab #}
+
+          <!-- ═══════════════════════════════════════════════ -->
+          <!-- JSON TAB                                        -->
+          <!-- ═══════════════════════════════════════════════ -->
+          <div class="tab-pane" id="json-{{ run.id }}">
+            <div class="json-toolbar">
+              <select class="json-select" onchange="switchJsonView(this,'{{ run.id }}')">
+                <option value="full">Full Output</option>
+                <option value="report">Report Data</option>
+                <option value="payload">Workflow Payload</option>
+              </select>
+              <button class="copy-btn" onclick="copyJson('json-code-{{ run.id }}')">📋 Copy</button>
+              <span id="copy-msg-{{ run.id }}" style="font-size:12px;color:var(--green);display:none">Copied!</span>
+            </div>
+            <div class="json-view" id="json-code-{{ run.id }}">{{ run.output | tojson(indent=2) if run.output is mapping else run.output }}</div>
+            {# Hidden data for JS #}
+            <script type="application/json" id="json-full-{{ run.id }}">{{ run.output | tojson if run.output is mapping else '{}' }}</script>
+            <script type="application/json" id="json-payload-{{ run.id }}">{{ run.payload | tojson if run.payload is mapping else '{}' }}</script>
+          </div>
+
+          <!-- ═══════════════════════════════════════════════ -->
+          <!-- WORKFLOW TAB                                    -->
+          <!-- ═══════════════════════════════════════════════ -->
+          <div class="tab-pane" id="flow-{{ run.id }}">
+            {% if steps %}
+            <div class="section-title">AI-Generated Workflow — {{ payload.get('workflow_name','') }}</div>
+            <div class="steps-flow">
+              <div class="step-row" style="border-color:rgba(20,184,166,.3)">
+                <div class="step-idx" style="background:var(--purple)">👤</div>
+                <div><div class="step-name">User Request</div><div style="font-size:12px;color:var(--muted);margin-top:2px">{{ run.request_text[:60] }}{% if run.request_text|length > 60 %}...{% endif %}</div></div>
+              </div>
+              <div class="step-arrow">↓</div>
+              <div class="step-row" style="border-color:rgba(20,184,166,.3)">
+                <div class="step-idx" style="background:var(--blue)">🤖</div>
+                <div><div class="step-name">AI Interpretation</div><div style="font-size:12px;color:var(--muted);margin-top:2px">Parsed intent into {{ steps | length }} workflow step(s)</div></div>
+              </div>
+              <div class="step-arrow">↓</div>
+              {% for step in steps %}
+              <div class="step-row">
+                <div class="step-idx">{{ loop.index }}</div>
+                <div>
+                  <div class="step-name">{{ step.get('name','') if step is mapping else '' }}<span class="step-action">{{ step.get('action','') if step is mapping else '' }}</span></div>
+                </div>
+              </div>
+              {% if not loop.last %}<div class="step-arrow">↓</div>{% endif %}
+              {% endfor %}
+              <div class="step-arrow">↓</div>
+              <div class="step-row" style="border-color:{% if run.execution_status=='success' %}rgba(34,197,94,.3){% else %}rgba(239,68,68,.3){% endif %}">
+                <div class="step-idx" style="background:{% if run.execution_status=='success' %}var(--green){% else %}var(--red){% endif %}">
+                  {{ '✓' if run.execution_status=='success' else '✗' }}
+                </div>
+                <div><div class="step-name">Execution — {{ run.execution_status }}</div><div style="font-size:12px;color:var(--muted);margin-top:2px">Delivery: {{ run.delivery_status }}</div></div>
+              </div>
+            </div>
+            {% else %}
+            <p style="color:var(--muted);font-size:13px">No workflow steps recorded.</p>
+            {% endif %}
+          </div>
+
+        </div>{# /run-card-body #}
+      </div>{# /run-card #}
+      {% endfor %}
+    </div>
+    {% endif %}
+  </section>
+
+</main>
+
+<script>
+// ── Tab switching ──────────────────────────────────────────────────
+function switchTab(btn, paneId) {
+  const card = btn.closest('.run-card-body');
+  card.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  card.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById(paneId).classList.add('active');
+}
+
+// ── JSON view switcher ─────────────────────────────────────────────
+function switchJsonView(select, runId) {
+  const code = document.getElementById('json-code-' + runId);
+  const view = select.value;
+  let data;
+  if (view === 'payload') {
+    data = JSON.parse(document.getElementById('json-payload-' + runId).textContent);
+  } else if (view === 'report') {
+    const full = JSON.parse(document.getElementById('json-full-' + runId).textContent);
+    data = full.leetcode_report || full.n8n_response || full;
+  } else {
+    data = JSON.parse(document.getElementById('json-full-' + runId).textContent);
+  }
+  code.textContent = JSON.stringify(data, null, 2);
+  highlightJson(code);
+}
+
+// ── Syntax highlighting for JSON ───────────────────────────────────
+function highlightJson(el) {
+  let text = el.textContent;
+  text = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  text = text.replace(
+    /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
+    match => {
+      let cls = 'json-num';
+      if (/^"/.test(match)) cls = /:$/.test(match) ? 'json-key' : 'json-str';
+      else if (/true|false/.test(match)) cls = 'json-bool';
+      else if (/null/.test(match)) cls = 'json-null';
+      return `<span class="${cls}">${match}</span>`;
+    }
+  );
+  el.innerHTML = text;
+}
+
+// ── Copy JSON ──────────────────────────────────────────────────────
+function copyJson(elId) {
+  const el = document.getElementById(elId);
+  navigator.clipboard.writeText(el.textContent).then(() => {
+    const runId = elId.replace('json-code-','');
+    const msg = document.getElementById('copy-msg-' + runId);
+    msg.style.display = 'inline';
+    setTimeout(() => msg.style.display = 'none', 2000);
+  });
+}
+
+// ── Quick example fill ─────────────────────────────────────────────
+function setExample(el) {
+  document.getElementById('requestText').value = el.textContent.trim().replace(/^[^\w]+/,'');
+  document.getElementById('requestText').focus();
+}
+
+// ── Form submit ────────────────────────────────────────────────────
+document.getElementById('requestForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('runBtn');
+  const msg = document.getElementById('statusMsg');
+  btn.textContent = '⏳ Running...';
+  btn.classList.add('loading');
+  btn.disabled = true;
+  msg.className = 'status-msg show info';
+  msg.textContent = 'Processing your request...';
+
+  const payload = {
+    user_id: document.getElementById('userId').value.trim(),
+    request_text: document.getElementById('requestText').value.trim()
+  };
+  const apiKey = document.getElementById('apiKey').value.trim();
+  const headers = {'Content-Type':'application/json'};
+  if (apiKey) headers['X-API-Key'] = apiKey;
+
+  try {
+    const res = await fetch('/api/requests', {method:'POST', headers, body: JSON.stringify(payload)});
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({detail: res.statusText}));
+      throw new Error(err.detail || res.statusText);
+    }
+    msg.className = 'status-msg show success';
+    msg.textContent = 'Report generated! Loading...';
+    setTimeout(() => window.location.reload(), 600);
+  } catch (err) {
+    msg.className = 'status-msg show error';
+    msg.textContent = 'Error: ' + err.message;
+    btn.textContent = '⚡ Run Automation';
+    btn.classList.remove('loading');
+    btn.disabled = false;
+  }
+});
+
+// ── Apply JSON highlighting on load ───────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.json-view').forEach(el => highlightJson(el));
+});
+</script>
+
 </body>
 </html>

@@ -1,12 +1,18 @@
+"""
+API key authentication dependency.
+Uses constant-time comparison (secrets.compare_digest) to prevent timing attacks.
+"""
 from fastapi import Header, HTTPException
 
 from .config import settings
 
 
 def require_api_key(x_api_key: str | None = Header(default=None)) -> None:
-    # In local dev, auth is optional unless explicitly configured.
-    if not settings.api_access_key:
-        return
-    if x_api_key != settings.api_access_key:
-        raise HTTPException(status_code=401, detail="Invalid or missing API key")
+    """
+    FastAPI dependency that enforces API key authentication.
 
+    - If API_ACCESS_KEY is not configured, the endpoint is publicly accessible.
+    - Comparison is performed in constant time to prevent timing-based attacks.
+    """
+    if not settings.verify_api_key(x_api_key):
+        raise HTTPException(status_code=401, detail="Invalid or missing API key")

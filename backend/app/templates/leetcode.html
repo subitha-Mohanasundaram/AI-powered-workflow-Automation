@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>LeetCode Class Tracker</title>
+  <style>
+    :root{--bg:#f1f5f9;--surface:#fff;--accent:#f59e0b;--green:#16a34a;--red:#dc2626;--blue:#2563eb;--muted:#64748b;--radius:12px;--shadow:0 4px 24px rgba(0,0,0,.08)}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:"Segoe UI",sans-serif;background:var(--bg);color:#0f172a}
+    .header{background:linear-gradient(135deg,#1e293b,#334155);color:#fff;padding:24px 32px;display:flex;align-items:center;gap:16px}
+    .header h1{font-size:22px;font-weight:700}
+    .header p{color:#94a3b8;font-size:13px;margin-top:4px}
+    .nav{display:flex;gap:8px;margin-top:12px}
+    .nav a{color:#94a3b8;text-decoration:none;font-size:13px;padding:4px 10px;border-radius:6px;border:1px solid #475569}
+    .nav a:hover{background:#475569;color:#fff}
+    .container{max-width:1200px;margin:24px auto;padding:0 16px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px}
+    .card{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px}
+    .card h2{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
+    .card .value{font-size:32px;font-weight:700}
+    .card .sub{font-size:12px;color:var(--muted);margin-top:4px}
+    .section{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px;margin-bottom:20px}
+    .section h3{font-size:16px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+    table{width:100%;border-collapse:collapse;font-size:14px}
+    th{text-align:left;padding:10px 8px;border-bottom:2px solid #e2e8f0;color:var(--muted);font-size:12px;text-transform:uppercase}
+    td{padding:10px 8px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
+    tr:hover td{background:#f8fafc}
+    .rank{font-weight:700;color:var(--muted);width:36px}
+    .rank.gold{color:#d97706}
+    .rank.silver{color:#64748b}
+    .rank.bronze{color:#b45309}
+    .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600}
+    .badge.easy{background:#dcfce7;color:#16a34a}
+    .badge.medium{background:#fef9c3;color:#92400e}
+    .badge.hard{background:#fee2e2;color:#dc2626}
+    .badge.active{background:#dbeafe;color:#1d4ed8}
+    .badge.inactive{background:#f1f5f9;color:#94a3b8}
+    .bar-wrap{display:flex;align-items:center;gap:8px}
+    .bar{height:8px;border-radius:4px;background:#e2e8f0;flex:1}
+    .bar-fill{height:100%;border-radius:4px;background:var(--accent)}
+    .topic-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
+    .topic-item{background:#f8fafc;border-radius:8px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;font-size:13px}
+    .topic-count{font-weight:700;color:var(--accent)}
+    .form-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+    input,select{padding:8px 12px;border-radius:8px;border:1px solid #e2e8f0;font-size:14px;min-width:200px}
+    button{padding:8px 18px;border-radius:8px;border:none;cursor:pointer;font-size:14px;font-weight:600}
+    .btn-primary{background:#f59e0b;color:#fff}
+    .btn-primary:hover{background:#d97706}
+    .btn-danger{background:#fee2e2;color:#dc2626}
+    .btn-danger:hover{background:#fecaca}
+    .btn-blue{background:#2563eb;color:#fff}
+    .btn-blue:hover{background:#1d4ed8}
+    .ask-box{display:flex;gap:10px;margin-bottom:16px}
+    .ask-box input{flex:1;min-width:0}
+    .answer-box{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:14px 16px;font-size:14px;line-height:1.6;display:none}
+    .today-item{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f1f5f9}
+    .problems-list{font-size:12px;color:var(--muted);margin-top:4px}
+    .empty{text-align:center;padding:40px;color:var(--muted)}
+    .status{font-size:13px;color:var(--muted);margin-top:8px;min-height:20px}
+    .loading{color:#f59e0b}
+    .success{color:var(--green)}
+    .error{color:var(--red)}
+    @media(max-width:640px){.form-row{flex-direction:column}.ask-box{flex-direction:column}}
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>🏆 LeetCode Class Tracker</h1>
+    <p>Track your students' real-time coding progress on LeetCode</p>
+    <div class="nav">
+      <a href="/dashboard">⚡ Automation Dashboard</a>
+      <a href="/docs">📖 API Docs</a>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- Summary cards -->
+  <div class="grid" id="summaryCards">
+    <div class="card"><h2>Total Students</h2><div class="value" id="totalStudents">—</div><div class="sub">in selected batch</div></div>
+    <div class="card"><h2>Active Today</h2><div class="value" id="activeToday" style="color:var(--green)">—</div><div class="sub">solved at least 1 problem</div></div>
+    <div class="card"><h2>Problems Today</h2><div class="value" id="solvedToday" style="color:var(--accent)">—</div><div class="sub">across all students</div></div>
+    <div class="card"><h2>Total All-Time</h2><div class="value" id="totalAllTime" style="color:var(--blue)">—</div><div class="sub">problems solved</div></div>
+    <div class="card"><h2>Avg per Student</h2><div class="value" id="avgSolved">—</div><div class="sub">problems solved</div></div>
+  </div>
+
+  <!-- Manage students -->
+  <div class="section">
+    <h3>👥 Manage Students
+      <span style="font-size:12px;color:var(--muted);font-weight:400">Add LeetCode usernames to track</span>
+    </h3>
+    <div class="form-row">
+      <input id="addUsername" placeholder="LeetCode username (e.g. neal_wu)" />
+      <input id="addRealName" placeholder="Student real name (optional)" />
+      <input id="addBatch" placeholder="Batch (e.g. CSE-A)" value="default" />
+      <button class="btn-primary" onclick="addStudent()">Add Student</button>
+    </div>
+    <p class="status" id="addStatus"></p>
+    <div id="studentList"></div>
+  </div>
+
+  <!-- Ask AI -->
+  <div class="section">
+    <h3>🤖 Ask About Your Students
+      <span style="font-size:12px;color:var(--muted);font-weight:400">Powered by GPT-4o-mini</span>
+    </h3>
+    <div class="ask-box">
+      <input id="askInput" placeholder="e.g. Who solved the most problems today? Which topics are students weakest in?" />
+      <button class="btn-blue" onclick="askQuestion()">Ask</button>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <button onclick="quickAsk('Who is the top performer in the class?')" style="padding:4px 10px;border-radius:6px;border:1px solid #e2e8f0;background:#f8fafc;font-size:12px;cursor:pointer">Top performer</button>
+      <button onclick="quickAsk('Who has not solved any problems today?')" style="padding:4px 10px;border-radius:6px;border:1px solid #e2e8f0;background:#f8fafc;font-size:12px;cursor:pointer">Inactive today</button>
+      <button onclick="quickAsk('Which topics should the class focus on to improve?')" style="padding:4px 10px;border-radius:6px;border:1px solid #e2e8f0;background:#f8fafc;font-size:12px;cursor:pointer">Weak topics</button>
+      <button onclick="quickAsk('Give me a full summary of the class performance')" style="padding:4px 10px;border-radius:6px;border:1px solid #e2e8f0;background:#f8fafc;font-size:12px;cursor:pointer">Full summary</button>
+      <button onclick="quickAsk('Who has the highest contest rating?')" style="padding:4px 10px;border-radius:6px;border:1px solid #e2e8f0;background:#f8fafc;font-size:12px;cursor:pointer">Contest rating</button>
+    </div>
+    <div class="answer-box" id="answerBox"></div>
+    <p class="status" id="askStatus"></p>
+  </div>
+
+  <!-- Report controls -->
+  <div class="section">
+    <h3>📊 Class Report
+      <span style="font-size:12px;color:var(--muted);font-weight:400">Live data from LeetCode</span>
+    </h3>
+    <div class="form-row">
+      <select id="batchSelect"><option value="default">Batch: default</option></select>
+      <button class="btn-primary" onclick="loadReport()">🔄 Generate Report</button>
+    </div>
+    <p class="status" id="reportStatus"></p>
+  </div>
+
+  <!-- Today's activity -->
+  <div class="section" id="todaySection" style="display:none">
+    <h3>⚡ Today's Activity</h3>
+    <div id="todayList"></div>
+  </div>
+
+  <!-- Leaderboard -->
+  <div class="section" id="leaderboardSection" style="display:none">
+    <h3>🏅 Class Leaderboard</h3>
+    <table>
+      <thead><tr><th>#</th><th>Student</th><th>Total</th><th>Easy</th><th>Medium</th><th>Hard</th><th>Today</th><th>Contest Rating</th></tr></thead>
+      <tbody id="leaderboardBody"></tbody>
+    </table>
+  </div>
+
+  <!-- Topic breakdown -->
+  <div class="section" id="topicsSection" style="display:none">
+    <h3>🏷️ Top Topics Across Class</h3>
+    <div class="topic-grid" id="topicGrid"></div>
+  </div>
+
+</div>
+
+<script>
+  let currentBatch = 'default';
+  let maxSolved = 1;
+
+  // ── Load students on page load ─────────────────────────────────────────────
+  window.addEventListener('DOMContentLoaded', () => {
+    loadStudents();
+  });
+
+  async function api(path, options = {}) {
+    const resp = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...options });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+      throw new Error(err.detail || resp.statusText);
+    }
+    return resp.json();
+  }
+
+  // ── Student management ─────────────────────────────────────────────────────
+  async function addStudent() {
+    const username = document.getElementById('addUsername').value.trim();
+    const realName = document.getElementById('addRealName').value.trim();
+    const batch = document.getElementById('addBatch').value.trim() || 'default';
+    const status = document.getElementById('addStatus');
+
+    if (!username) { status.textContent = 'Enter a LeetCode username'; status.className = 'status error'; return; }
+    status.textContent = `Verifying @${username} on LeetCode...`; status.className = 'status loading';
+
+    try {
+      const data = await api('/api/leetcode/students', {
+        method: 'POST',
+        body: JSON.stringify({ username, real_name: realName, batch })
+      });
+      status.textContent = `✓ ${data.message} — ${data.total_solved} problems solved all-time`; status.className = 'status success';
+      document.getElementById('addUsername').value = '';
+      document.getElementById('addRealName').value = '';
+      loadStudents();
+    } catch (e) {
+      status.textContent = '✗ ' + e.message; status.className = 'status error';
+    }
+  }
+
+  async function loadStudents() {
+    try {
+      const data = await api(`/api/leetcode/students?batch=${currentBatch}`);
+      const list = document.getElementById('studentList');
+      if (!data.students.length) {
+        list.innerHTML = '<p class="empty">No students added yet. Add a LeetCode username above to get started.</p>';
+        return;
+      }
+      list.innerHTML = `<table><thead><tr><th>Username</th><th>Real Name</th><th>Added</th><th></th></tr></thead><tbody>
+        ${data.students.map(s => `
+          <tr>
+            <td><a href="https://leetcode.com/${s.username}" target="_blank" style="color:#2563eb;text-decoration:none">@${s.username}</a></td>
+            <td>${s.real_name || '—'}</td>
+            <td style="color:var(--muted);font-size:12px">${new Date(s.added_at).toLocaleDateString()}</td>
+            <td><button class="btn-danger" onclick="removeStudent('${s.username}')" style="padding:4px 10px;font-size:12px">Remove</button></td>
+          </tr>`).join('')}
+      </tbody></table>`;
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function removeStudent(username) {
+    if (!confirm(`Remove @${username} from tracker?`)) return;
+    try {
+      await api(`/api/leetcode/students/${username}`, { method: 'DELETE' });
+      loadStudents();
+    } catch (e) { alert(e.message); }
+  }
+
+  // ── Report ─────────────────────────────────────────────────────────────────
+  async function loadReport() {
+    const status = document.getElementById('reportStatus');
+    status.textContent = 'Fetching live data from LeetCode...'; status.className = 'status loading';
+
+    try {
+      const report = await api(`/api/leetcode/report?batch=${currentBatch}`);
+      status.textContent = `✓ Report generated for ${report.summary.total_students} students — ${report.date}`; status.className = 'status success';
+      renderReport(report);
+    } catch (e) {
+      status.textContent = '✗ ' + e.message; status.className = 'status error';
+    }
+  }
+
+  function renderReport(report) {
+    const s = report.summary;
+
+    // Summary cards
+    document.getElementById('totalStudents').textContent = s.total_students;
+    document.getElementById('activeToday').textContent = s.active_today;
+    document.getElementById('solvedToday').textContent = s.problems_solved_today;
+    document.getElementById('totalAllTime').textContent = s.total_problems_solved_alltime.toLocaleString();
+    document.getElementById('avgSolved').textContent = s.average_solved;
+
+    // Today's activity
+    const todaySection = document.getElementById('todaySection');
+    const todayList = document.getElementById('todayList');
+    todaySection.style.display = 'block';
+    if (!report.today_activity.length) {
+      todayList.innerHTML = '<p class="empty" style="padding:16px">No students have solved problems today yet.</p>';
+    } else {
+      todayList.innerHTML = report.today_activity.map(s => `
+        <div class="today-item">
+          <div>
+            <strong>${s.real_name}</strong>
+            <a href="https://leetcode.com/${s.username}" target="_blank" style="color:var(--muted);font-size:12px;margin-left:6px">@${s.username}</a>
+            <div class="problems-list">${s.problems.join(' · ') || ''}</div>
+          </div>
+          <span class="badge active">${s.problems_today} solved today</span>
+        </div>`).join('');
+    }
+
+    // Leaderboard
+    document.getElementById('leaderboardSection').style.display = 'block';
+    maxSolved = Math.max(...report.leaderboard.map(s => s.total_solved), 1);
+    document.getElementById('leaderboardBody').innerHTML = report.leaderboard.map((s, i) => {
+      const rankClass = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
+      const rankIcon = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : s.rank;
+      const pct = Math.round((s.total_solved / maxSolved) * 100);
+      return `<tr>
+        <td class="rank ${rankClass}">${rankIcon}</td>
+        <td>
+          <strong>${s.real_name}</strong><br/>
+          <a href="https://leetcode.com/${s.username}" target="_blank" style="color:var(--muted);font-size:12px">@${s.username}</a>
+        </td>
+        <td>
+          <div class="bar-wrap">
+            <strong>${s.total_solved}</strong>
+            <div class="bar"><div class="bar-fill" style="width:${pct}%"></div></div>
+          </div>
+        </td>
+        <td><span class="badge easy">${s.easy}</span></td>
+        <td><span class="badge medium">${s.medium}</span></td>
+        <td><span class="badge hard">${s.hard}</span></td>
+        <td>${s.solved_today > 0 ? `<span class="badge active">+${s.solved_today}</span>` : '<span class="badge inactive">—</span>'}</td>
+        <td>${s.contest_rating ? '⭐ ' + s.contest_rating : '—'}</td>
+      </tr>`;
+    }).join('');
+
+    // Topics
+    document.getElementById('topicsSection').style.display = 'block';
+    const maxTopicCount = Math.max(...Object.values(report.top_topics), 1);
+    document.getElementById('topicGrid').innerHTML = Object.entries(report.top_topics)
+      .slice(0, 20)
+      .map(([topic, count]) => `
+        <div class="topic-item">
+          <span>${topic}</span>
+          <span class="topic-count">${count}</span>
+        </div>`).join('');
+  }
+
+  // ── Ask AI ─────────────────────────────────────────────────────────────────
+  async function askQuestion() {
+    const question = document.getElementById('askInput').value.trim();
+    if (!question) return;
+    await doAsk(question);
+  }
+
+  async function quickAsk(q) {
+    document.getElementById('askInput').value = q;
+    await doAsk(q);
+  }
+
+  async function doAsk(question) {
+    const status = document.getElementById('askStatus');
+    const answerBox = document.getElementById('answerBox');
+    status.textContent = 'Thinking...'; status.className = 'status loading';
+    answerBox.style.display = 'none';
+
+    try {
+      const data = await api('/api/leetcode/ask', {
+        method: 'POST',
+        body: JSON.stringify({ question, batch: currentBatch })
+      });
+      answerBox.textContent = data.answer;
+      answerBox.style.display = 'block';
+      status.textContent = `Analysed ${data.students_analysed} students`; status.className = 'status success';
+    } catch (e) {
+      status.textContent = '✗ ' + e.message; status.className = 'status error';
+    }
+  }
+
+  // Enter key on ask input
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('askInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') askQuestion();
+    });
+    document.getElementById('addUsername').addEventListener('keydown', e => {
+      if (e.key === 'Enter') addStudent();
+    });
+  });
+</script>
+</body>
+</html>

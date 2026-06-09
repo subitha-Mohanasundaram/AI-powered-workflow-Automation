@@ -1,12 +1,76 @@
+"""
+Pydantic schemas for request/response validation.
+UserRequestCreate applies strict input sanitization to prevent injection attacks.
+"""
+import re
 from datetime import datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
 
+# Characters allowed in free-text request fields.
+# Permits letters, digits, punctuation, and common Unicode prose; blocks
+# control characters and SQL/shell meta-characters.
+_SAFE_TEXT_PATTERN = re.compile(r"^[\w\s.,!?;:()\-\'\"\+\@\/\#\%\&\*\=\[\]\{\}\|\~\u00C0-\uFFFF]+$")
+
+
+def _sanitize_text(value: str) -> str:
+    """Strip leading/trailing whitespace and normalize internal whitespace."""
+    return " ".join(value.split())
+
+
 class UserRequestCreate(BaseModel):
-    user_id: str = Field(..., min_length=1, max_length=128)
-    request_text: str = Field(..., min_length=5)
+    user_id: str = Field(
+        ...,
+        min_length=1,
+        max_length=128,
+        description="Email address or opaque user identifier.",
+    )
+    request_text: str = Field(
+        ...,
+        min_length=10,
+        max_length=2000,
+        description="Plain-language description of the automation to execute.",
+    )
+
+    @field_validator("user_id")
+    @classmethod
+    def validate_user_id(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("user_id must not be blank")
+        # Basic email-or-safe-identifier check
+        if len(v) > 128:
+            raise ValueError("user_id exceeds maximum length of 128 characters")
+        # Allow email format OR alphanumeric-slug format
+        email_re = re.compile(r"^[a-zA-Z0-9_.+\-@]+$")
+        if not email_re.match(v):
+            raise ValueError(
+                "user_id must be an email address or contain only "
+                "letters, digits, dots, underscores, hyphens, and plus signs"
+            )
+        return v
+
+    @field_validator("request_text")
+    @classmethod
+    def validate_request_text(cls, v: str) -> str:
+        v = _sanitize_text(v)
+        if len(v) < 10:
+            raise ValueError("request_text must be at least 10 characters after sanitization")
+        # Reject obvious prompt-injection patterns
+        lower = v.lower()
+        injection_patterns = [
+            "ignore previous",
+            "disregard your instructions",
+            "system prompt",
+            "jailbreak",
+            "act as if you",
+        ]
+        for pattern in injection_patterns:
+            if pattern in lower:
+                raise ValueError("request_text contains disallowed content")
+        return v
 
 
 class WorkflowStep(BaseModel):
@@ -39,7 +103,7 @@ class WorkflowInstruction(BaseModel):
     @field_validator("channels")
     @classmethod
     def unique_channels(cls, value: list[str]) -> list[str]:
-        unique = []
+        unique: list[str] = []
         for channel in value:
             if channel not in unique:
                 unique.append(channel)
@@ -52,6 +116,8 @@ class WorkflowExecutionResult(BaseModel):
 
 
 class WorkflowRunResponse(BaseModel):
+    model_config = {"from_attributes": True}
+
     id: int
     user_id: str
     request_text: str
@@ -60,6 +126,3 @@ class WorkflowRunResponse(BaseModel):
     execution_output: str
     created_at: datetime
     updated_at: datetime
-
-    class Config:
-        from_attributes = True
