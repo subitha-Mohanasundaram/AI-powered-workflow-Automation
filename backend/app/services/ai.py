@@ -1,16 +1,23 @@
 """
-AI Interpreter Service — powered by the official OpenAI Python SDK.
+AI Interpreter Service — powered by the OpenAI-compatible SDK.
+
+Supports any OpenAI-compatible provider via AI_BASE_URL:
+  - Groq  (default): https://api.groq.com/openai/v1
+  - OpenAI:          https://api.openai.com/v1
+  - OpenRouter:      https://openrouter.ai/api/v1
 
 Flow:
   1. Validate that AI_API_KEY is set.
-  2. Call OpenAI chat completions with a structured JSON-mode prompt.
-  3. Parse and validate the response against WorkflowInstruction schema.
-  4. On any failure (network, quota, bad JSON, schema mismatch) fall back
+  2. Call the chat completions endpoint with a structured JSON prompt.
+  3. Extract JSON from the response (handles both raw JSON and markdown fences).
+  4. Parse and validate against WorkflowInstruction schema.
+  5. On any failure (network, quota, bad JSON, schema mismatch) fall back
      to the rule-based heuristic so the API never returns an error to the user.
 
 Token usage is logged on every successful call so you can monitor costs.
 """
 import json
+import re
 from typing import Optional
 
 import tiktoken
@@ -73,23 +80,51 @@ Rules:
 # ── Client factory (singleton per process) ───────────────────────────────────
 _client: Optional[OpenAI] = None
 
+# Providers that reliably support json_object response_format
+_JSON_MODE_PROVIDERS = ("openai.com", "openrouter.ai")
+
 
 def _get_client() -> OpenAI:
-    """Return a cached OpenAI client, creating it on first use."""
+    """Return a cached OpenAI-compatible client, creating it on first use."""
     global _client
     if _client is None:
         _client = OpenAI(
             api_key=settings.ai_api_key,
             base_url=settings.ai_base_url.rstrip("/"),
             timeout=settings.ai_timeout_seconds,
-            max_retries=2,          # SDK-level auto-retry on transient errors
+            max_retries=2,
         )
         logger.info(
-            "OpenAI client initialised | base_url=%s | model=%s",
+            "LLM client initialised | provider=%s | model=%s",
             settings.ai_base_url,
             settings.ai_model,
         )
     return _client
+
+
+def _supports_json_mode() -> bool:
+    """Return True if the configured provider supports response_format json_object."""
+    return any(p in settings.ai_base_url for p in _JSON_MODE_PROVIDERS)
+
+
+def _extract_json(text: str) -> str:
+    """
+    Extract a JSON object from a response string.
+    Handles:
+      - Raw JSON
+      - JSON wrapped in ```json ... ``` markdown fences
+      - JSON wrapped in ``` ... ``` fences
+    """
+    text = text.strip()
+    # Strip markdown code fences if present
+    fence_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+    if fence_match:
+        return fence_match.group(1)
+    # Find the first { ... } block
+    brace_match = re.search(r"\{.*\}", text, re.DOTALL)
+    if brace_match:
+        return brace_match.group(0)
+    return text
 
 
 def _count_tokens(text: str, model: str) -> int:
@@ -117,7 +152,7 @@ class AIInterpreterService:
         if not settings.ai_api_key or settings.ai_api_key in ("replace_me", ""):
             logger.warning(
                 "AI_API_KEY not configured — rule-based fallback active. "
-                "Add a real key to AI_API_KEY in .env to enable GPT interpretation."
+                "Add a Groq key (console.groq.com/keys) or any OpenAI-compatible key to AI_API_KEY in .env."
             )
             return AIInterpreterService._fallback_instruction(request_text)
 
@@ -125,74 +160,80 @@ class AIInterpreterService:
             return AIInterpreterService._call_openai(request_text)
         except AuthenticationError:
             logger.error(
-                "OpenAI authentication failed — check AI_API_KEY in .env. "
+                "LLM authentication failed — check AI_API_KEY in .env. "
                 "Using rule-based fallback."
             )
         except RateLimitError:
             logger.error(
-                "OpenAI rate limit exceeded — using rule-based fallback. "
-                "Check your usage at platform.openai.com/usage"
+                "LLM rate limit exceeded — using rule-based fallback. "
+                "Check your usage at the provider dashboard."
             )
         except APITimeoutError:
             logger.error(
-                "OpenAI request timed out after %ds — using rule-based fallback.",
+                "LLM request timed out after %ds — using rule-based fallback.",
                 settings.ai_timeout_seconds,
             )
         except APIConnectionError as exc:
             logger.error(
-                "OpenAI connection error — using rule-based fallback | error=%s", exc
+                "LLM connection error — using rule-based fallback | error=%s", exc
             )
         except APIStatusError as exc:
             logger.error(
-                "OpenAI API error — using rule-based fallback | status=%d | body=%s",
+                "LLM API error — using rule-based fallback | status=%d | body=%s",
                 exc.status_code,
                 exc.message,
             )
         except (ValidationError, ValueError, KeyError) as exc:
             logger.error(
-                "OpenAI response failed schema validation — using rule-based fallback | error=%s",
+                "LLM response failed schema validation — using rule-based fallback | error=%s",
                 exc,
             )
         except Exception as exc:
             logger.error(
-                "Unexpected OpenAI error — using rule-based fallback | error=%s",
+                "Unexpected LLM error — using rule-based fallback | error=%s",
                 exc,
                 exc_info=True,
             )
 
         return AIInterpreterService._fallback_instruction(request_text)
 
-    # ── OpenAI call ───────────────────────────────────────────────────────────
+    # ── LLM call ──────────────────────────────────────────────────────────────
 
     @staticmethod
     def _call_openai(request_text: str) -> WorkflowInstruction:
         """
-        Call OpenAI chat completions API using the official SDK.
+        Call an OpenAI-compatible chat completions endpoint.
+        Works with Groq, OpenAI, OpenRouter, and other compatible providers.
         Raises on any API or validation error — caller handles fallback.
         """
         client = _get_client()
         prompt_tokens = _count_tokens(_SYSTEM_PROMPT + request_text, settings.ai_model)
         logger.info(
-            "Calling OpenAI | model=%s | ~prompt_tokens=%d",
+            "Calling LLM | provider=%s | model=%s | ~prompt_tokens=%d",
+            settings.ai_base_url,
             settings.ai_model,
             prompt_tokens,
         )
 
-        response = client.chat.completions.create(
+        # Build kwargs — only add response_format for providers that support it
+        kwargs: dict = dict(
             model=settings.ai_model,
             temperature=0.1,
-            response_format={"type": "json_object"},
             messages=[
                 {"role": "system", "content": _SYSTEM_PROMPT},
                 {"role": "user", "content": request_text},
             ],
         )
+        if _supports_json_mode():
+            kwargs["response_format"] = {"type": "json_object"}
+
+        response = client.chat.completions.create(**kwargs)
 
         # Log token usage for cost monitoring
         usage = response.usage
         if usage:
             logger.info(
-                "OpenAI usage | model=%s | prompt_tokens=%d | completion_tokens=%d | total_tokens=%d",
+                "LLM usage | model=%s | prompt_tokens=%d | completion_tokens=%d | total_tokens=%d",
                 settings.ai_model,
                 usage.prompt_tokens,
                 usage.completion_tokens,
@@ -201,15 +242,17 @@ class AIInterpreterService:
 
         raw_content = response.choices[0].message.content
         if not raw_content:
-            raise ValueError("OpenAI returned an empty response content")
+            raise ValueError("LLM returned an empty response")
 
-        logger.debug("OpenAI raw response | length=%d | content=%s", len(raw_content), raw_content[:300])
+        logger.debug("LLM raw response | length=%d | content=%s", len(raw_content), raw_content[:300])
 
-        parsed = json.loads(raw_content)
+        # Extract JSON — handles raw JSON and markdown-fenced responses
+        json_str = _extract_json(raw_content)
+        parsed = json.loads(json_str)
         instruction = WorkflowInstruction(**parsed)
 
         logger.info(
-            "OpenAI interpretation successful | workflow=%s | steps=%d | channels=%s",
+            "LLM interpretation successful | workflow=%s | steps=%d | channels=%s",
             instruction.workflow_name,
             len(instruction.steps),
             instruction.channels,

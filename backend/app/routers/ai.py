@@ -59,7 +59,7 @@ def ai_status() -> AIStatusResponse:
             model=settings.ai_model,
             base_url=settings.ai_base_url,
             reachable=False,
-            error="AI_API_KEY is not set. Add your OpenAI key to .env",
+            error="AI_API_KEY is not set. Get a free Groq key at console.groq.com/keys and add it to .env",
         )
 
     # Make a minimal real API call to verify the key works
