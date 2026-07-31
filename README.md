@@ -140,3 +140,58 @@ JSON
   "user_id": "user@example.com",
   "request_text": "Fetch the weather for Chennai and send me a daily report"
 }
+
+⏰ Scheduled Workflows
+POST /api/scheduled — Create a scheduled job.
+
+GET /api/scheduled?user_id=... — List workflows for a user.
+
+POST /api/scheduled/{id}/run — Trigger manual execution.
+
+POST /api/scheduled/{id}/pause — Pause active schedule.
+
+POST /api/scheduled/{id}/resume — Resume paused schedule.
+
+Supported Schedules: every_day, every_hour, every_monday, every_weekday, every_30_minutes, every_6_hours, or custom cron strings (e.g., cron:0 9 * * 1).
+
+⚙️ Environment Configuration (.env)
+┌───────────────────────────┬───────────────────────────────────────────────────────┬─────────────────────────┐
+│ Variable                  │ Purpose                                               │ Default                 │
+├───────────────────────────┼───────────────────────────────────────────────────────┼─────────────────────────┤
+│ APP_NAME                  │ Application display title                             │ AI Workflow Automation  │
+│ APP_ENV                   │ Mode (development / production)                       │ development             │
+│ SECRET_KEY                │ Encryption key for confidential user profiles        │ (Required)              │
+│ DATABASE_URL              │ Relational database connection string                 │ sqlite:///./automation  │
+│ AI_API_KEY                │ OpenAI service key                                    │ (Required)              │
+│ AI_MODEL                  │ Primary LLM selection                                 │ gpt-4o-mini             │
+│ RATE_LIMIT_REQUESTS       │ Window-based request throttling limit                 │ 100                     │
+│ N8N_WEBHOOK_URL           │ Endpoint target for dispatched workflows              │ Set in docker-compose   │
+└───────────────────────────┴───────────────────────────────────────────────────────┴─────────────────────────┘
+📂 Project Structure
+Code snippet
+.
+├── 📁 backend/                 # FastAPI server, AI services, and APScheduler
+│   ├── 📁 app/
+│   │   ├── 📄 main.py          # Entry point & global middleware
+│   │   ├── 📁 routers/         # API routes (Requests, Scheduler, AI, LeetCode)
+│   │   └── 📁 services/        # Logic (AI parser, Fernet encryption, Execution)
+│   └── 📁 tests/            # Pytest test suite
+├── 📁 incident-api/            # Express.js incident storage server
+├── 📁 incident-dashboard/      # React + Vite visualization interface
+├── 📁 simulator/               # Metrics and log spike generator
+├── 📁 monitoring/              # Prometheus, Loki, Promtail & Grafana configs
+├── 📁 n8n-workflows/           # Pre-built importable n8n workflow JSONs
+├── 📁 scripts/                 # Utility scripts & verification suite
+└── 📄 docker-compose.yml       # Container orchestration spec
+🤝 Demo & Testing Scripts
+Run test scripts from your terminal to verify pipeline components:
+
+Bash
+# Test FastAPI automation pipeline
+python scripts/demo_request_fastapi.py
+
+# Verify health status across all running container services
+python scripts/verify_all.py
+
+# Run unit tests with coverage report
+cd backend && pytest tests/ -v --cov=app
