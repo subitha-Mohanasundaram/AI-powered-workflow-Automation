@@ -1,9 +1,4 @@
-# AI-Powered Workflow Automation Platform
 
-A full-stack, production-style automation platform that combines a **FastAPI backend**, **n8n workflow orchestration**, **AI-powered natural language interpretation**, and an **incident detection system** with real-time monitoring.
-
----
-<div align="center">
 
 # 🤖 AI-Powered Workflow Automation Platform
 
@@ -38,3 +33,59 @@ This platform combines a **FastAPI backend**, **n8n workflow orchestration**, **
 - `API_ACCESS_KEY` should be set in production to restrict API access
 - All sensitive user data (SMTP credentials, API keys, Slack webhooks) is encrypted at rest using `cryptography` (Fernet)
 - Input validation and prompt-injection prevention are applied on all text fields
+
+    🗣️ Plain-English Request ──┐
+                              ├──► 🧠 GPT-4o-mini Interpreter ──► ⚡ n8n Execution Engine ──► 📊 Dashboards & Alerts
+   📈 Simulated Metrics/Logs ─┘
+
+---
+
+## ✨ Key Capabilities
+
+<details open>
+<summary><b>1. 💬 Natural Language Automation</b></summary>
+Submit plain-English text prompts; the AI interprets the request, maps parameters, and dispatches structured n8n execution pipelines automatically.
+</details>
+
+<details>
+<summary><b>2. 🚨 Real-Time Incident Triage</b></summary>
+Simulates system metric spikes, collects logs via Loki/Promtail, and leverages n8n workflows to auto-detect P1–P3 issues and infer root causes.
+</details>
+
+<details>
+<summary><b>3. 🔒 End-to-End Encryption & Security</b></summary>
+Sensitive user credentials (SMTP details, API keys, Slack Webhooks) are encrypted at rest using Fernet. Features replay-safe `X-Idempotency-Key` headers and per-user rate limiting.
+</details>
+
+<details>
+<summary><b>4. ⏰ Flexible Scheduling Engine</b></summary>
+Built-in support for recurring jobs (`every_day`, `every_hour`, cron strings) managed directly via APScheduler.
+</details>
+
+<details>
+<summary><b>5. 📊 Full-Stack Observability</b></summary>
+Pre-configured Prometheus metrics scraping, Loki log aggregation, and customized Grafana visual dashboards.
+</details>
+
+---
+
+## 🛠️ Architecture Overview
+
+User / Client
+│
+▼
+FastAPI Backend (Port 8000)
+├── 🧠 AI Interpreter (OpenAI GPT-4o-mini)
+├── 📐 Workflow Generator & APScheduler
+├── ⚡ Execution Engine ──► n8n Orchestrator (Port 5678)
+├── 🔒 Fernet Profile Encryption & DB (SQLite)
+└── 📡 Delivery Engine (Email / Slack / Dashboard)
+
+Incident Detection Stack
+├── 🎲 Metrics & Log Simulator ──► Prometheus (Port 9090) + Loki (Port 3100)
+├── 🔍 n8n Investigation Workflow
+├── 🟢 Node.js Incident API (Port 8001) + MongoDB
+└── 💻 React Incident Dashboard (Port 3000)
+
+Monitoring & Observability
+└── 📊 Grafana Dashboard (Port 3001)
