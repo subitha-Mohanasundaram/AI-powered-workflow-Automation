@@ -89,3 +89,54 @@ Incident Detection Stack
 
 Monitoring & Observability
 └── 📊 Grafana Dashboard (Port 3001)
+---
+
+## 🔌 Services and Ports
+
+| Service | Local Endpoint | Auth / Credentials | Description |
+| :--- | :--- | :--- | :--- |
+| **FastAPI Backend** | `http://localhost:8000` | `X-API-Key` Header | Core automation API |
+| **Swagger Docs** | `http://localhost:8000/docs` | *None* | Interactive API playground |
+| **Incident API** | `http://localhost:8001` | *None* | Express/Node incident store |
+| **React Dashboard** | `http://localhost:3000` | *None* | Incident management UI |
+| **n8n Orchestrator**| `http://localhost:5678` | `admin` / `admin` | Workflow engine UI |
+| **Grafana** | `http://localhost:3001` | `admin` / `admin` | Metrics & log viewer |
+| **Prometheus** | `http://localhost:9090` | *None* | Time-series metrics engine |
+| **Loki Logs** | `http://localhost:3100` | *None* | Centralized log aggregator |
+| **Metrics Simulator**| `http://localhost:9000/metrics`| *None* | Simulated metric target |
+
+---
+
+## ⚡ Quick Start (Docker)
+
+### 1️⃣ Clone & Configure Environment
+```bash
+copy .env.example .env
+Edit your .env file to include your OpenAI API key and encryption secret:
+
+Code snippet
+AI_API_KEY=sk-...            # Your OpenAI API Key
+SECRET_KEY=your-random-key  # Strong random string for Fernet encryption
+2️⃣ Launch Full Stack
+Bash
+docker compose up --build
+📖 API Reference
+🏥 Health Probes
+GET /health — Liveness check. Returns {"status":"ok"}.
+
+GET /health/ready — Readiness probe (validates database connection).
+
+🤖 Automation Requests
+POST /api/requests — Submit a natural language request.
+
+GET /api/runs — Fetch execution history (limit: 100).
+
+GET /api/runs/{id} — Fetch single workflow execution details.
+
+Sample Request Body (POST /api/requests):
+
+JSON
+{
+  "user_id": "user@example.com",
+  "request_text": "Fetch the weather for Chennai and send me a daily report"
+}
