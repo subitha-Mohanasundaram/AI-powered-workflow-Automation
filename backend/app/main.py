@@ -19,11 +19,16 @@ from .database import Base, engine
 from .logging_config import configure_logging, get_logger
 from .rate_limit import RateLimitMiddleware
 from .routers.ai import router as ai_router
+from .routers.auth import router as auth_router
 from .routers.dashboard import router as dashboard_router
+from .routers.execution_logs import router as execution_logs_router
 from .routers.health import router as health_router
 from .routers.leetcode import router as leetcode_router
+from .routers.plugins import router as plugins_router
 from .routers.requests import router as request_router
 from .routers.scheduled import router as scheduled_router
+from .routers.sse import router as sse_router
+from .routers.v1.workflows import router as workflows_v1_router
 
 # Configure logging before anything else so all startup messages are captured.
 configure_logging(settings.log_level)
@@ -69,6 +74,7 @@ def _custom_openapi(app: FastAPI):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     from . import models  # noqa: F401
+    from . import models_v2  # noqa: F401  — Phase 2 tables
     from .services.scheduler import reload_all_jobs, start_scheduler, stop_scheduler
 
     logger.info("Starting %s | env=%s | db=%s", settings.app_name, settings.app_env, settings.database_url.split("://")[0])
@@ -116,6 +122,13 @@ app.include_router(leetcode_router)
 app.include_router(scheduled_router)
 app.include_router(request_router)
 app.include_router(dashboard_router)
+
+# ── Phase 1 + 2 v1 routers ────────────────────────────────────────────────────
+app.include_router(auth_router)
+app.include_router(execution_logs_router)
+app.include_router(plugins_router)
+app.include_router(sse_router)
+app.include_router(workflows_v1_router)
 
 # ── OpenAPI schema customisation ──────────────────────────────────────────────
 app.openapi = lambda: _custom_openapi(app)  # type: ignore[method-assign]

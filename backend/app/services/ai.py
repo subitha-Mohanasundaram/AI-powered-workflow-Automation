@@ -29,11 +29,19 @@ from openai import (
     OpenAI,
     RateLimitError,
 )
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from ..config import settings
 from ..logging_config import get_logger
 from ..schemas import WorkflowInstruction
+
+
+# ── Clarification model ───────────────────────────────────────────────────────
+
+class ClarificationQuestion(BaseModel):
+    needs_clarification: bool
+    question: str = ""
+    partial_instruction: Optional[WorkflowInstruction] = None
 
 logger = get_logger(__name__)
 
@@ -303,3 +311,73 @@ class AIInterpreterService:
             # Always default to dashboard if no channel mentioned
             channels.append("dashboard")
         return channels
+
+    # ── Clarification agent ───────────────────────────────────────────────────
+
+    # Intent keywords used to compute confidence score
+    _INTENT_KEYWORDS = [
+        "fetch", "get", "retrieve", "pull",
+        "report", "summary", "analytics", "analyze",
+        "send", "email", "notify", "slack", "alert",
+        "schedule", "daily", "weekly", "cron",
+        "transform", "filter", "aggregate", "process",
+        "dashboard", "update", "store",
+    ]
+
+    @staticmethod
+    def _confidence_score(request_text: str) -> float:
+        """
+        Simple heuristic confidence score: count matched intent keywords / 10,
+        capped at 1.0.
+        """
+        lower = request_text.lower()
+        matched = sum(1 for kw in AIInterpreterService._INTENT_KEYWORDS if kw in lower)
+        return min(matched / 10.0, 1.0)
+
+    @staticmethod
+    def check_clarification(request_text: str) -> ClarificationQuestion:
+        """
+        Check if the request needs clarification before execution.
+        Returns ClarificationQuestion with needs_clarification=True if confidence < 0.5.
+        """
+        score = AIInterpreterService._confidence_score(request_text)
+        logger.info("Confidence score | score=%.2f | request=%.60s...", score, request_text)
+
+        if score < 0.5:
+            question = AIInterpreterService._generate_clarification_question(request_text)
+            return ClarificationQuestion(
+                needs_clarification=True,
+                question=question,
+                partial_instruction=None,
+            )
+
+        # High enough confidence — attempt partial interpretation for context
+        try:
+            partial = AIInterpreterService._fallback_instruction(request_text)
+            return ClarificationQuestion(
+                needs_clarification=False,
+                question="",
+                partial_instruction=partial,
+            )
+        except Exception:
+            return ClarificationQuestion(needs_clarification=False, question="")
+
+    @staticmethod
+    def _generate_clarification_question(request_text: str) -> str:
+        """Generate a targeted clarification question for an ambiguous request."""
+        lower = request_text.lower()
+
+        if len(request_text.strip()) < 20:
+            return ("Your request is quite brief. Could you describe what data you want "
+                    "to fetch, what action to perform, and where to deliver results?")
+
+        if not any(kw in lower for kw in ["email", "slack", "dashboard", "notify", "send"]):
+            return ("Where should the results be delivered? "
+                    "For example: email, Slack, or dashboard?")
+
+        if not any(kw in lower for kw in ["fetch", "get", "report", "data", "analyze", "update"]):
+            return ("What action should be performed? "
+                    "For example: fetch data, generate a report, or send a notification?")
+
+        return ("Could you provide more details about your automation request? "
+                "Please specify the data source, the action to perform, and the delivery channel.")

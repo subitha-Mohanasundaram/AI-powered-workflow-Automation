@@ -5,15 +5,17 @@ Smart execution — detects the intent of the workflow and runs the right handle
 
   - LeetCode keywords  → fetch REAL LeetCode data for tracked students
   - n8n configured     → dispatch to n8n webhook
-  - everything else    → run locally with simulated data
+  - everything else    → run locally with step-by-step logging and retry
 
-This means:
-  "generate a report on leetcode solving status"   → real LeetCode data
-  "fetch sales data and generate a report"         → local simulated data
-  "send report to Slack"                           → local + Slack delivery
+Step execution:
+  - Each step creates an ExecutionLog row (status=running)
+  - On failure: retries up to 3x with exponential backoff (1s, 2s, 4s)
+  - After all retries exhausted: marks run failed, creates Notification
 """
+import json
 import time
 from datetime import UTC, datetime
+from typing import Optional
 
 import requests as http_requests
 
@@ -57,6 +59,115 @@ def _is_leetcode_request(raw_request: str) -> bool:
     return any(kw in lower for kw in _LEETCODE_KEYWORDS)
 
 
+# ── Execution Log helpers ─────────────────────────────────────────────────────
+
+def _create_step_log(db, run_id: int, step_index: int, step_name: str, action: str):
+    """Create an ExecutionLog row with status=running."""
+    from ..models_v2 import ExecutionLog
+    log = ExecutionLog(
+        run_id=run_id,
+        step_index=step_index,
+        step_name=step_name,
+        action=action,
+        status="running",
+        started_at=datetime.now(UTC),
+    )
+    db.add(log)
+    db.commit()
+    db.refresh(log)
+    return log
+
+
+def _update_step_log(db, log, status: str, output=None, error: Optional[str] = None,
+                     retry_count: int = 0):
+    """Update an existing ExecutionLog row."""
+    finished = datetime.now(UTC)
+    log.status = status
+    log.finished_at = finished
+    if log.started_at:
+        delta = finished - log.started_at
+        log.duration_ms = int(delta.total_seconds() * 1000)
+    if output is not None:
+        log.output_json = json.dumps(output) if not isinstance(output, str) else output
+    if error:
+        log.error_message = error[:2000]
+    log.retry_count = retry_count
+    db.commit()
+
+
+def _create_failure_notification(db, user_id: int, run_id: int, step_name: str, error_msg: str):
+    """Create an in-app failure notification for the user."""
+    try:
+        from ..models_v2 import Notification
+        notif = Notification(
+            user_id=user_id,
+            type="failure",
+            title=f"Workflow step '{step_name}' failed",
+            message=f"Run #{run_id}: {error_msg[:500]}",
+            run_id=run_id,
+        )
+        db.add(notif)
+        db.commit()
+    except Exception as exc:
+        logger.warning("Failed to create failure notification | error=%s", exc)
+
+
+# ── Step action executor ──────────────────────────────────────────────────────
+
+def _run_step_action(step: dict, workflow_payload: dict,
+                     fetched_data: Optional[dict], report_data: Optional[dict]):
+    """Execute a single step action. Returns (result_dict, updated_fetched, updated_report)."""
+    action = step.get("action", "")
+    name = step.get("name", action)
+    raw_request = workflow_payload.get("raw_request", "")
+
+    if action == "api_fetch":
+        from .data_fetcher import auto_fetch
+        user_context = workflow_payload.get("user_context", {})
+        fetched_data = auto_fetch(raw_request, user_context)
+        result = {"step": name, "status": "completed", "result": fetched_data}
+
+    elif action == "transform_data":
+        result = {
+            "step": name,
+            "status": "completed",
+            "result": {
+                "processed_records": fetched_data.get("records", 0) if fetched_data else 0,
+                "transformations": ["filter_nulls", "normalize_values", "aggregate"],
+                "timestamp": datetime.now(UTC).isoformat(),
+            },
+        }
+
+    elif action == "report_generation":
+        data = fetched_data or {}
+        source = data.get("source", "internal")
+        workflow_name = workflow_payload.get("workflow_name", "automation")
+        report_data = {
+            "title": f"Automated Report — {workflow_name.replace('_', ' ').title()}",
+            "generated_at": datetime.now(UTC).isoformat(),
+            "source": source,
+            "summary": data.get("summary", "Data processed successfully."),
+            "request": raw_request,
+            "data": data,
+            "sections": _build_report_sections(data, source),
+        }
+        result = {"step": name, "status": "completed", "result": report_data}
+
+    elif action == "email_send":
+        result = {"step": name, "status": "queued_for_delivery", "channel": "email"}
+
+    elif action == "slack_notify":
+        result = {"step": name, "status": "queued_for_delivery", "channel": "slack"}
+
+    elif action == "dashboard_update":
+        result = {"step": name, "status": "completed", "channel": "dashboard"}
+
+    else:
+        result = {"step": name, "status": "completed"}
+
+    return result, fetched_data, report_data
+
+
 # ── LeetCode execution ────────────────────────────────────────────────────────
 
 def _execute_leetcode(workflow_payload: dict) -> WorkflowExecutionResult:
@@ -76,7 +187,6 @@ def _execute_leetcode(workflow_payload: dict) -> WorkflowExecutionResult:
 
     logger.info("LeetCode execution | run_id=%s | fetching real data", run_id)
 
-    # Get tracked students from DB
     db = SessionLocal()
     try:
         students = db.query(LeetCodeStudent).filter(LeetCodeStudent.is_active == 1).all()
@@ -84,7 +194,6 @@ def _execute_leetcode(workflow_payload: dict) -> WorkflowExecutionResult:
         db.close()
 
     if not students:
-        # No students added — return a helpful message
         logger.warning("No students tracked — returning guidance response | run_id=%s", run_id)
         return WorkflowExecutionResult(
             status="success",
@@ -114,7 +223,6 @@ def _execute_leetcode(workflow_payload: dict) -> WorkflowExecutionResult:
             },
         )
 
-    # Fetch real data
     usernames = [s.username for s in students]
     logger.info("Fetching LeetCode data | students=%s", usernames)
     report = generate_class_report(usernames)
@@ -136,7 +244,6 @@ def _execute_leetcode(workflow_payload: dict) -> WorkflowExecutionResult:
     today = report["today_activity"]
     top_topics = list(report["top_topics"].items())[:5]
 
-    # Build human-readable report text
     top3 = leaderboard[:3]
     top3_text = " | ".join(
         f"{s['rank']}. {s['real_name']} ({s['total_solved']} solved)" for s in top3
@@ -165,7 +272,7 @@ def _execute_leetcode(workflow_payload: dict) -> WorkflowExecutionResult:
             "execution_mode": "leetcode",
             "channels": channels,
             "steps_completed": 3,
-            "leetcode_report": report,          # full report for downstream use
+            "leetcode_report": report,
             "n8n_response": {
                 "mode": "leetcode_tracker",
                 "affected_service": "LeetCode Class Tracker",
@@ -181,7 +288,6 @@ def _execute_leetcode(workflow_payload: dict) -> WorkflowExecutionResult:
                 ),
                 "severity": "info",
                 "timestamp": datetime.now(UTC).isoformat(),
-                # Embedded full data for dashboard rendering
                 "summary": summary,
                 "leaderboard": leaderboard[:10],
                 "today_activity": today,
@@ -191,14 +297,13 @@ def _execute_leetcode(workflow_payload: dict) -> WorkflowExecutionResult:
     )
 
 
-# ── Local (simulated) execution ───────────────────────────────────────────────
+# ── Report section builder ────────────────────────────────────────────────────
 
 def _build_report_sections(data: dict, source: str) -> list:
     """Build structured report sections from fetched data."""
-    sections = []
     if source == "open-meteo":
         current = data.get("current", {})
-        sections = [
+        return [
             {"heading": "Current Conditions", "content": data.get("summary", "")},
             {"heading": "Temperature", "content": f"{current.get('temperature', '--')} (feels like {current.get('feels_like', '--')})"},
             {"heading": "Humidity & Wind", "content": f"Humidity: {current.get('humidity', '--')}, Wind: {current.get('wind_speed', '--')}"},
@@ -213,37 +318,37 @@ def _build_report_sections(data: dict, source: str) -> list:
         ]
         for i, a in enumerate(articles[:5], 1):
             sections.append({"heading": f"Article {i}", "content": f"{a.get('title', '')} — {a.get('source', '')} ({a.get('published_at', '')[:10]})"})
+        return sections
     elif source == "github":
         stats = data.get("stats", {})
         commits = data.get("recent_commits", [])
-        sections = [
+        return [
             {"heading": "Repository", "content": data.get("summary", "")},
             {"heading": "Stats", "content": f"Stars: {stats.get('stars', 0)}, Forks: {stats.get('forks', 0)}, Issues: {stats.get('open_issues', 0)}, Language: {stats.get('language', '--')}"},
             {"heading": "Recent Commits", "content": " | ".join(f"{c['message']} by {c['author']}" for c in commits[:3])},
         ]
     elif source == "open.er-api.com":
-        sections = [
+        return [
             {"heading": "Exchange Rates", "content": data.get("summary", "")},
             {"heading": "Key Rates", "content": str(data.get("rates", {}))},
         ]
     elif source == "custom_url":
-        sections = [
+        return [
             {"heading": "Source", "content": data.get("url", "")},
             {"heading": "Summary", "content": data.get("summary", "")},
             {"heading": "Data", "content": str(data.get("data", ""))[:500]},
         ]
-    else:
-        sections = [
-            {"heading": "Summary", "content": data.get("summary", "Data processed successfully.")},
-            {"heading": "Records", "content": str(data.get("records", "N/A"))},
-        ]
-    return sections
+    return [
+        {"heading": "Summary", "content": data.get("summary", "Data processed successfully.")},
+        {"heading": "Records", "content": str(data.get("records", "N/A"))},
+    ]
 
 
-def _execute_locally(workflow_payload: dict) -> WorkflowExecutionResult:
+# ── Local execution with step logging ────────────────────────────────────────
+
+def _execute_locally(workflow_payload: dict, db=None, user_id: Optional[int] = None) -> WorkflowExecutionResult:
     """
-    In-process execution with simulated data.
-    Used for non-LeetCode requests when n8n is not configured.
+    In-process execution with step-by-step ExecutionLog rows and retry logic.
     """
     run_id = workflow_payload.get("run_id")
     correlation_id = workflow_payload.get("correlation_id", "-")
@@ -254,102 +359,148 @@ def _execute_locally(workflow_payload: dict) -> WorkflowExecutionResult:
 
     logger.info("Local execution | run_id=%s | workflow=%s | steps=%d", run_id, workflow_name, len(steps))
 
-    step_results = []
-    fetched_data = None
-    report_data = None
+    # Get a DB session if not provided
+    own_db = False
+    if db is None:
+        from ..database import SessionLocal
+        db = SessionLocal()
+        own_db = True
 
-    for step in steps:
-        action = step.get("action", "")
-        name = step.get("name", action)
+    try:
+        step_results = []
+        fetched_data = None
+        report_data = None
+        failed_step_name = None
+        failed_error = None
 
-        if action == "api_fetch":
-            # Use real data fetcher based on request intent
-            from .data_fetcher import auto_fetch
-            user_context = workflow_payload.get("user_context", {})
-            fetched_data = auto_fetch(raw_request, user_context)
-            step_results.append({"step": name, "status": "completed", "result": fetched_data})
+        for idx, step in enumerate(steps):
+            action = step.get("action", "")
+            name = step.get("name", action)
 
-        elif action == "transform_data":
-            step_results.append({
-                "step": name,
-                "status": "completed",
-                "result": {
-                    "processed_records": fetched_data.get("records", 0) if fetched_data else 0,
-                    "transformations": ["filter_nulls", "normalize_values", "aggregate"],
+            # Create execution log entry
+            log = None
+            if run_id:
+                try:
+                    log = _create_step_log(db, run_id, idx, name, action)
+                except Exception as exc:
+                    logger.warning("Could not create step log | error=%s", exc)
+
+            # Retry logic: up to 3 attempts with exponential backoff
+            success = False
+            last_error = ""
+            result = None
+            retry_count = 0
+
+            for attempt in range(3):
+                try:
+                    result, fetched_data, report_data = _run_step_action(
+                        step, workflow_payload, fetched_data, report_data
+                    )
+                    success = True
+                    break
+                except Exception as exc:
+                    last_error = str(exc)
+                    retry_count = attempt + 1
+                    logger.warning(
+                        "Step failed | run_id=%s | step=%s | attempt=%d/3 | error=%s",
+                        run_id, name, attempt + 1, exc
+                    )
+                    if attempt < 2:
+                        time.sleep(2 ** attempt)  # 1s, 2s, 4s
+
+            if success and result is not None:
+                step_results.append(result)
+                if log:
+                    try:
+                        _update_step_log(db, log, "success", output=result, retry_count=retry_count)
+                    except Exception:
+                        pass
+            else:
+                # All retries exhausted
+                failed_step_name = name
+                failed_error = last_error
+                if log:
+                    try:
+                        _update_step_log(db, log, "failed", error=last_error, retry_count=retry_count)
+                    except Exception:
+                        pass
+                if run_id and user_id:
+                    _create_failure_notification(db, user_id, run_id, name, last_error)
+                logger.error(
+                    "Step permanently failed | run_id=%s | step=%s | error=%s",
+                    run_id, name, last_error
+                )
+                break  # Stop processing remaining steps
+
+        # If a step failed, generate failure report and mark run as failed
+        if failed_step_name:
+            from .failure_reporter import generate_failure_report
+            failure_report = generate_failure_report(run_id or 0, failed_step_name, failed_error or "")
+            return WorkflowExecutionResult(
+                status="failed",
+                output={
+                    "run_id": run_id,
+                    "correlation_id": correlation_id,
+                    "workflow_name": workflow_name,
+                    "status": "failed",
+                    "execution_mode": "local",
+                    "channels": channels,
+                    "steps_completed": len(step_results),
+                    "step_results": step_results,
+                    "failure_report": failure_report,
+                    "n8n_response": {
+                        "mode": "local_execution",
+                        "severity": "error",
+                        "timestamp": datetime.now(UTC).isoformat(),
+                    },
+                },
+            )
+
+        summary = (
+            report_data.get("summary") if report_data
+            else f"Processed {fetched_data.get('records', 0)} records successfully." if fetched_data
+            else "Workflow completed successfully."
+        )
+
+        return WorkflowExecutionResult(
+            status="success",
+            output={
+                "run_id": run_id,
+                "correlation_id": correlation_id,
+                "workflow_name": workflow_name,
+                "status": "success",
+                "execution_mode": "local",
+                "channels": channels,
+                "steps_completed": len(step_results),
+                "step_results": step_results,
+                "n8n_response": {
+                    "mode": "local_execution",
+                    "affected_service": workflow_name.replace("_", " ").title(),
+                    "probable_root_cause": summary,
+                    "recommended_actions": f"Results delivered to: {', '.join(channels)}",
+                    "priority_message": f"{len(step_results)} step(s) completed successfully",
+                    "severity": "info",
                     "timestamp": datetime.now(UTC).isoformat(),
                 },
-            })
-
-        elif action == "report_generation":
-            data = fetched_data or {}
-            # Build rich report from whatever was fetched
-            source = data.get("source", "internal")
-            summary_text = data.get("summary", "Data processed successfully.")
-            report_data = {
-                "title": f"Automated Report — {workflow_name.replace('_', ' ').title()}",
-                "generated_at": datetime.now(UTC).isoformat(),
-                "source": source,
-                "summary": summary_text,
-                "request": raw_request,
-                "data": data,
-                "sections": _build_report_sections(data, source),
-            }
-            step_results.append({"step": name, "status": "completed", "result": report_data})
-
-        elif action == "email_send":
-            step_results.append({"step": name, "status": "queued_for_delivery", "channel": "email"})
-
-        elif action == "slack_notify":
-            step_results.append({"step": name, "status": "queued_for_delivery", "channel": "slack"})
-
-        elif action == "dashboard_update":
-            step_results.append({"step": name, "status": "completed", "channel": "dashboard"})
-
-        else:
-            step_results.append({"step": name, "status": "completed"})
-
-    summary = (
-        report_data.get("summary") if report_data
-        else f"Processed {fetched_data.get('records', 0)} records successfully." if fetched_data
-        else "Workflow completed successfully."
-    )
-
-    return WorkflowExecutionResult(
-        status="success",
-        output={
-            "run_id": run_id,
-            "correlation_id": correlation_id,
-            "workflow_name": workflow_name,
-            "status": "success",
-            "execution_mode": "local",
-            "channels": channels,
-            "steps_completed": len(step_results),
-            "step_results": step_results,
-            "n8n_response": {
-                "mode": "local_execution",
-                "affected_service": workflow_name.replace("_", " ").title(),
-                "probable_root_cause": summary,
-                "recommended_actions": f"Results delivered to: {', '.join(channels)}",
-                "priority_message": f"{len(step_results)} step(s) completed successfully",
-                "severity": "info",
-                "timestamp": datetime.now(UTC).isoformat(),
             },
-        },
-    )
+        )
+    finally:
+        if own_db:
+            db.close()
 
 
 # ── Main service ──────────────────────────────────────────────────────────────
 
 class ExecutionEngineService:
     @staticmethod
-    def execute(workflow_payload: dict) -> WorkflowExecutionResult:
+    def execute(workflow_payload: dict, db=None, user_id: Optional[int] = None) -> WorkflowExecutionResult:
         """
         Smart dispatcher — picks the right execution mode based on request intent.
 
         Priority order:
           1. LeetCode request  → fetch real LeetCode data
           2. n8n configured    → send to n8n webhook
-          3. fallback          → run locally with simulated data
+          3. fallback          → run locally with step logging and retry
         """
         raw_request = workflow_payload.get("raw_request", "")
         run_id = workflow_payload.get("run_id")
@@ -407,4 +558,4 @@ class ExecutionEngineService:
             logger.warning("n8n failed — falling back to local | run_id=%s | error=%s", run_id, last_error)
 
         # ── Local fallback ──────────────────────────────────────────────────
-        return _execute_locally(workflow_payload)
+        return _execute_locally(workflow_payload, db=db, user_id=user_id)

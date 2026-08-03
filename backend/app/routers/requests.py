@@ -105,6 +105,15 @@ def create_request(
         )
 
         # ── AI interpretation ────────────────────────────────────────────────
+        # Check clarification first
+        clarification = AIInterpreterService.check_clarification(request_in.request_text)
+        if clarification.needs_clarification:
+            return {
+                "status": "needs_clarification",
+                "question": clarification.question,
+                "run_id": None,
+            }
+
         instruction = AIInterpreterService.interpret_request(request_in.request_text)
 
         # ── Persist initial run record ───────────────────────────────────────
@@ -132,7 +141,7 @@ def create_request(
         run.workflow_payload = json.dumps(payload)
 
         # ── Execute via n8n ──────────────────────────────────────────────────
-        execution_result = ExecutionEngineService.execute(payload)
+        execution_result = ExecutionEngineService.execute(payload, db=db)
         run.execution_status = execution_result.status
         run.execution_output = json.dumps(execution_result.output)
         logger.info(
