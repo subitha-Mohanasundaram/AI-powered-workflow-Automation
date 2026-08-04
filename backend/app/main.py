@@ -27,6 +27,7 @@ from .routers.leetcode import router as leetcode_router
 from .routers.plugins import router as plugins_router
 from .routers.requests import router as request_router
 from .routers.scheduled import router as scheduled_router
+from .routers.planner import router as planner_router
 from .routers.sse import router as sse_router
 from .routers.v1.workflows import router as workflows_v1_router
 
@@ -127,6 +128,7 @@ app.include_router(dashboard_router)
 app.include_router(auth_router)
 app.include_router(execution_logs_router)
 app.include_router(plugins_router)
+app.include_router(planner_router)
 app.include_router(sse_router)
 app.include_router(workflows_v1_router)
 
